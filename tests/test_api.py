@@ -217,3 +217,22 @@ async def test_async_dispose_no_api(hass):
     """Test dispose without prior connect does not raise."""
     client = _make_client(hass)
     await client.async_dispose()
+
+
+# --- not initialized guards ---
+
+
+async def test_async_get_server_info_not_initialized(hass):
+    """Test async_get_server_info raises ApiClientError when not connected."""
+    client = _make_client(hass)
+
+    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
+        await client.async_get_server_info()
+
+
+async def test_async_get_data_not_initialized(hass):
+    """Test async_get_data raises ApiClientError when not connected."""
+    client = _make_client(hass)
+
+    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
+        await client.async_get_data()

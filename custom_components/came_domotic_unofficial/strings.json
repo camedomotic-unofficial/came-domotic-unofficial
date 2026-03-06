@@ -27,7 +27,7 @@
       "unknown": "Unexpected error."
     },
     "abort": {
-      "already_configured": "Device is already configured.",
+      "already_configured": "This CAME server is already configured.",
       "reconfigure_successful": "Reconfiguration successful."
     }
   },
@@ -35,9 +35,6 @@
     "step": {
       "init": {
         "data": {
-          "host": "Host",
-          "username": "Username",
-          "password": "Password",
           "scan_interval": "Scan Interval (seconds)"
         },
         "description": "Configure options.",

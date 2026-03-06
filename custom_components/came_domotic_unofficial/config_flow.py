@@ -39,8 +39,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-# TODO: Add the DHCP autodisccover step
-
 
 async def _async_test_credentials(
     hass,
@@ -115,7 +113,7 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                     ),
                 }
                 return self.async_create_entry(
-                    title=user_input[CONF_HOST],
+                    title=f"CAME Domotic ({user_input[CONF_HOST]})",
                     data=data,
                     options=options,
                 )
@@ -174,7 +172,7 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(
                         CONF_HOST,
-                        default=reconfigure_entry.data.get(CONF_HOST, ""),
+                        default=reconfigure_entry.data[CONF_HOST],
                     ): str,
                     vol.Required(
                         CONF_USERNAME,
@@ -204,52 +202,16 @@ class CameDomoticUnofficialOptionsFlowHandler(OptionsFlow):
         user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Manage the options."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            host = user_input[CONF_HOST]
-            username = user_input[CONF_USERNAME]
-            password = user_input[CONF_PASSWORD]
-            scan_interval = user_input[CONF_SCAN_INTERVAL]
-
-            try:
-                await _async_test_credentials(self.hass, host, username, password)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-
-            if not errors:
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry,
-                    data={
-                        **self.config_entry.data,
-                        CONF_HOST: host,
-                        CONF_USERNAME: username,
-                        CONF_PASSWORD: password,
-                    },
-                )
-                return self.async_create_entry(
-                    title="",
-                    data={CONF_SCAN_INTERVAL: scan_interval},
-                )
+            return self.async_create_entry(
+                title="",
+                data={CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL]},
+            )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_HOST,
-                        default=self.config_entry.data.get(CONF_HOST, ""),
-                    ): str,
-                    vol.Required(
-                        CONF_USERNAME,
-                        default=self.config_entry.data.get(CONF_USERNAME, ""),
-                    ): str,
-                    vol.Required(CONF_PASSWORD): str,
                     vol.Required(
                         CONF_SCAN_INTERVAL,
                         default=self.config_entry.options.get(
@@ -259,7 +221,6 @@ class CameDomoticUnofficialOptionsFlowHandler(OptionsFlow):
                     ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)),
                 }
             ),
-            errors=errors,
         )
 
 

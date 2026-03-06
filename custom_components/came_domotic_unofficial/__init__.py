@@ -16,12 +16,10 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
 from .api import CameDomoticUnofficialApiClient
 from .coordinator import CameDomoticUnofficialDataUpdateCoordinator
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: list[Platform] = []  # [Platform.BINARY_SENSOR, Platform.SENSOR, Platform.SWITCH]
 
 type CameDomoticUnofficialConfigEntry = ConfigEntry[RuntimeData]
 
@@ -30,7 +28,7 @@ type CameDomoticUnofficialConfigEntry = ConfigEntry[RuntimeData]
 class RuntimeData:
     """Class to hold runtime data."""
 
-    coordinator: DataUpdateCoordinator
+    coordinator: CameDomoticUnofficialDataUpdateCoordinator
 
 
 async def async_setup_entry(
@@ -75,7 +73,10 @@ async def async_remove_config_entry_device(
     config_entry: ConfigEntry,
     device_entry: DeviceEntry,
 ) -> bool:
-    """Delete device if selected from UI."""
+    """Delete device if selected from UI.
+
+    Removing a device/entity is permitted without need of further actions.
+    """
     return True
 
 

@@ -68,6 +68,8 @@ class CameDomoticUnofficialApiClient:
 
     async def async_get_server_info(self) -> Any:
         """Get server info (triggers lazy auth on first call)."""
+        if self._api is None:
+            raise CameDomoticUnofficialApiClientError("Not initialized")
         try:
             return await self._api.async_get_server_info()
         except CameDomoticAuthError as err:
@@ -85,6 +87,8 @@ class CameDomoticUnofficialApiClient:
 
     async def async_get_data(self) -> dict[str, Any]:
         """Fetch data from the CAME Domotic server."""
+        if self._api is None:
+            raise CameDomoticUnofficialApiClientError("Not initialized")
         try:
             server_info = await self._api.async_get_server_info()
             return {
