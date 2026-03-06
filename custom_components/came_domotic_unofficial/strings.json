@@ -6,14 +6,18 @@
         "title": "CAME Domotic Unofficial",
         "description": "If you need help with the configuration have a look here: https://github.com/camedomotic-unofficial/came-domotic-unofficial",
         "data": {
+          "host": "Host",
           "username": "Username",
-          "password": "Password"
+          "password": "Password",
+          "scan_interval": "Scan Interval (seconds)"
         }
       },
       "reconfigure": {
         "data": {
+          "host": "Host",
           "username": "Username",
-          "password": "Password"
+          "password": "Password",
+          "scan_interval": "Scan Interval (seconds)"
         }
       }
     },
@@ -31,6 +35,9 @@
     "step": {
       "init": {
         "data": {
+          "host": "Host",
+          "username": "Username",
+          "password": "Password",
           "scan_interval": "Scan Interval (seconds)"
         },
         "description": "Configure options.",

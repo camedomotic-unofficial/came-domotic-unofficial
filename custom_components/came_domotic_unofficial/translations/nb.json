@@ -6,14 +6,18 @@
         "title": "CAME Domotic Unofficial",
         "description": "Hvis du trenger hjep til konfigurasjon ta en titt her: https://github.com/camedomotic-unofficial/came-domotic-unofficial",
         "data": {
+          "host": "Vert",
           "username": "Brukernavn",
-          "password": "Passord"
+          "password": "Passord",
+          "scan_interval": "Skanneintervall (sekunder)"
         }
       },
       "reconfigure": {
         "data": {
+          "host": "Vert",
           "username": "Brukernavn",
-          "password": "Passord"
+          "password": "Passord",
+          "scan_interval": "Skanneintervall (sekunder)"
         }
       }
     },
@@ -31,6 +35,9 @@
     "step": {
       "init": {
         "data": {
+          "host": "Vert",
+          "username": "Brukernavn",
+          "password": "Passord",
           "scan_interval": "Skanneintervall (sekunder)"
         },
         "description": "Konfigurer alternativer.",

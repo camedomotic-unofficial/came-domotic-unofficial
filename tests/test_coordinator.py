@@ -24,8 +24,8 @@ async def test_coordinator_update_success(hass, bypass_get_data):
 
     coordinator = config_entry.runtime_data.coordinator
     assert coordinator.data is not None
-    assert coordinator.data["title"] == "foo"
-    assert coordinator.data["body"] == "some body text"
+    assert coordinator.data["keycode"] == "AA:BB:CC:DD:EE:FF"
+    assert coordinator.data["software_version"] == "1.2.3"
 
 
 async def test_coordinator_auth_error_raises_config_entry_auth_failed(

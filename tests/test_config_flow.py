@@ -1,4 +1,6 @@
 """Test CAME Domotic Unofficial config flow."""
+from __future__ import annotations
+
 from unittest.mock import patch
 
 import pytest
@@ -7,13 +9,27 @@ from custom_components.came_domotic_unofficial.api import (
     CameDomoticUnofficialApiClientCommunicationError,
     CameDomoticUnofficialApiClientError,
 )
-from custom_components.came_domotic_unofficial.const import DOMAIN
+from custom_components.came_domotic_unofficial.const import (
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .const import MOCK_CONFIG
+from .const import MOCK_KEYCODE
+
+_API_CLIENT = (
+    "custom_components.came_domotic_unofficial.api."
+    "CameDomoticUnofficialApiClient"
+)
+
+MOCK_USER_INPUT = {**MOCK_CONFIG, CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL}
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +42,10 @@ def bypass_setup_fixture():
         yield
 
 
-async def test_successful_config_flow(hass, bypass_get_data):
+# --- User flow ---
+
+
+async def test_successful_config_flow(hass, bypass_test_credentials):
     """Test a successful config flow."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -36,12 +55,13 @@ async def test_successful_config_flow(hass, bypass_get_data):
     assert result["step_id"] == "user"
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=MOCK_CONFIG
+        result["flow_id"], user_input=MOCK_USER_INPUT
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "test_username"
+    assert result["title"] == MOCK_CONFIG[CONF_HOST]
     assert result["data"] == MOCK_CONFIG
+    assert result["options"] == {CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL}
     assert result["result"]
 
 
@@ -52,12 +72,11 @@ async def test_config_flow_cannot_connect(hass):
     )
 
     with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
+        f"{_API_CLIENT}.async_connect",
         side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
@@ -70,13 +89,18 @@ async def test_config_flow_invalid_auth(hass):
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
 
-    with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
-        side_effect=CameDomoticUnofficialApiClientAuthenticationError("Bad creds"),
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            side_effect=CameDomoticUnofficialApiClientAuthenticationError(
+                "Bad creds"
+            ),
+        ),
+        patch(f"{_API_CLIENT}.async_dispose"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
@@ -90,21 +114,22 @@ async def test_config_flow_unknown_error(hass):
     )
 
     with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
+        f"{_API_CLIENT}.async_connect",
         side_effect=Exception("Unexpected"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "unknown"}
 
 
-async def test_config_flow_single_entry_abort(hass, bypass_get_data):
+async def test_config_flow_single_entry_abort(hass, bypass_test_credentials):
     """Test that only one config entry is allowed (single_config_entry)."""
-    entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG)
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=MOCK_CONFIG, unique_id=MOCK_KEYCODE
+    )
     entry.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(
@@ -115,35 +140,28 @@ async def test_config_flow_single_entry_abort(hass, bypass_get_data):
     assert result["reason"] == "single_instance_allowed"
 
 
-async def test_reconfigure_flow_success(hass, bypass_get_data):
-    """Test successful reconfigure flow updates credentials."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data=MOCK_CONFIG,
-        unique_id="test_username",
-    )
-    entry.add_to_hass(hass)
-
+async def test_config_flow_generic_api_error(hass):
+    """Test that base ApiClientError (non-comm, non-auth) maps to cannot_connect."""
     result = await hass.config_entries.flow.async_init(
-        DOMAIN,
-        context={
-            "source": config_entries.SOURCE_RECONFIGURE,
-            "entry_id": entry.entry_id,
-        },
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
+
+    with (
+        patch(
+            f"{_API_CLIENT}.async_connect",
+            side_effect=CameDomoticUnofficialApiClientError("Parse error"),
+        ),
+        patch(f"{_API_CLIENT}.async_dispose"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input=MOCK_USER_INPUT
+        )
 
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "reconfigure"
+    assert result["errors"] == {"base": "cannot_connect"}
 
-    new_config = {CONF_USERNAME: "new_user", CONF_PASSWORD: "new_pass"}
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], user_input=new_config
-    )
 
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "reconfigure_successful"
-    assert entry.data[CONF_USERNAME] == "new_user"
-    assert entry.data[CONF_PASSWORD] == "new_pass"
+# --- Reconfigure flow ---
 
 
 async def _init_reconfigure_flow(hass, entry):
@@ -159,21 +177,50 @@ async def _init_reconfigure_flow(hass, entry):
     return result
 
 
+async def test_reconfigure_flow_success(hass, bypass_test_credentials):
+    """Test successful reconfigure flow updates credentials and options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=MOCK_CONFIG,
+        unique_id=MOCK_KEYCODE,
+    )
+    entry.add_to_hass(hass)
+
+    result = await _init_reconfigure_flow(hass, entry)
+    assert result["step_id"] == "reconfigure"
+
+    new_input = {
+        CONF_HOST: "192.168.1.200",
+        CONF_USERNAME: "new_user",
+        CONF_PASSWORD: "new_pass",
+        CONF_SCAN_INTERVAL: 60,
+    }
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], user_input=new_input
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HOST] == "192.168.1.200"
+    assert entry.data[CONF_USERNAME] == "new_user"
+    assert entry.data[CONF_PASSWORD] == "new_pass"
+    assert entry.options[CONF_SCAN_INTERVAL] == 60
+
+
 async def test_reconfigure_flow_cannot_connect(hass):
     """Test reconfigure flow with connection error shows cannot_connect."""
     entry = MockConfigEntry(
-        domain=DOMAIN, data=MOCK_CONFIG, unique_id="test_username"
+        domain=DOMAIN, data=MOCK_CONFIG, unique_id=MOCK_KEYCODE
     )
     entry.add_to_hass(hass)
     result = await _init_reconfigure_flow(hass, entry)
 
     with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
+        f"{_API_CLIENT}.async_connect",
         side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
@@ -183,18 +230,23 @@ async def test_reconfigure_flow_cannot_connect(hass):
 async def test_reconfigure_flow_invalid_auth(hass):
     """Test reconfigure flow with auth error shows invalid_auth."""
     entry = MockConfigEntry(
-        domain=DOMAIN, data=MOCK_CONFIG, unique_id="test_username"
+        domain=DOMAIN, data=MOCK_CONFIG, unique_id=MOCK_KEYCODE
     )
     entry.add_to_hass(hass)
     result = await _init_reconfigure_flow(hass, entry)
 
-    with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
-        side_effect=CameDomoticUnofficialApiClientAuthenticationError("Bad creds"),
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            side_effect=CameDomoticUnofficialApiClientAuthenticationError(
+                "Bad creds"
+            ),
+        ),
+        patch(f"{_API_CLIENT}.async_dispose"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
@@ -204,45 +256,28 @@ async def test_reconfigure_flow_invalid_auth(hass):
 async def test_reconfigure_flow_unknown_error(hass):
     """Test reconfigure flow with unexpected error shows unknown."""
     entry = MockConfigEntry(
-        domain=DOMAIN, data=MOCK_CONFIG, unique_id="test_username"
+        domain=DOMAIN, data=MOCK_CONFIG, unique_id=MOCK_KEYCODE
     )
     entry.add_to_hass(hass)
     result = await _init_reconfigure_flow(hass, entry)
 
     with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
+        f"{_API_CLIENT}.async_connect",
         side_effect=Exception("Unexpected"),
     ):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
+            result["flow_id"], user_input=MOCK_USER_INPUT
         )
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "unknown"}
 
 
-async def test_config_flow_generic_api_error(hass):
-    """Test that base ApiClientError (non-comm, non-auth) maps to cannot_connect."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-
-    with patch(
-        "custom_components.came_domotic_unofficial.api."
-        "CameDomoticUnofficialApiClient.async_get_data",
-        side_effect=CameDomoticUnofficialApiClientError("Parse error"),
-    ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input=MOCK_CONFIG
-        )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": "cannot_connect"}
+# --- Options flow ---
 
 
-async def test_options_flow(hass, bypass_get_data):
-    """Test options flow for scan interval."""
+async def test_options_flow(hass, bypass_get_data, bypass_test_credentials):
+    """Test options flow updates credentials and scan interval."""
     entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     entry.add_to_hass(hass)
 
@@ -252,10 +287,96 @@ async def test_options_flow(hass, bypass_get_data):
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
 
+    options_input = {
+        CONF_HOST: "192.168.1.200",
+        CONF_USERNAME: "new_user",
+        CONF_PASSWORD: "new_pass",
+        CONF_SCAN_INTERVAL: 60,
+    }
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
-        user_input={CONF_SCAN_INTERVAL: 60},
+        user_input=options_input,
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options == {CONF_SCAN_INTERVAL: 60}
+    assert entry.data[CONF_HOST] == "192.168.1.200"
+    assert entry.data[CONF_USERNAME] == "new_user"
+
+
+async def test_options_flow_cannot_connect(
+    hass, bypass_get_data
+):
+    """Test options flow with connection error shows cannot_connect."""
+    entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    options_input = {**MOCK_CONFIG, CONF_SCAN_INTERVAL: 60}
+    with patch(
+        f"{_API_CLIENT}.async_connect",
+        side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=options_input,
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_options_flow_invalid_auth(
+    hass, bypass_get_data
+):
+    """Test options flow with auth error shows invalid_auth."""
+    entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    options_input = {**MOCK_CONFIG, CONF_SCAN_INTERVAL: 60}
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            side_effect=CameDomoticUnofficialApiClientAuthenticationError(
+                "Bad creds"
+            ),
+        ),
+        patch(f"{_API_CLIENT}.async_dispose"),
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=options_input,
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_options_flow_unknown_error(
+    hass, bypass_get_data
+):
+    """Test options flow with unexpected error shows unknown."""
+    entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    options_input = {**MOCK_CONFIG, CONF_SCAN_INTERVAL: 60}
+    with patch(
+        f"{_API_CLIENT}.async_connect",
+        side_effect=Exception("Unexpected"),
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input=options_input,
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "unknown"}

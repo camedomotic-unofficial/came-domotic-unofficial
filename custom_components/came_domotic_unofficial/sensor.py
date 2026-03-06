@@ -29,4 +29,4 @@ class CameDomoticUnofficialSensor(CameDomoticUnofficialEntity, SensorEntity):
     @property
     def native_value(self) -> str | None:
         """Return the state of the sensor."""
-        return self.coordinator.data.get("body")
+        return self.coordinator.data.get("software_version")

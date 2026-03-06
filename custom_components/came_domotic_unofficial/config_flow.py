@@ -5,34 +5,67 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
-from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.config_entries import OptionsFlow
+from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .api import (
-    CameDomoticUnofficialApiClient,
-    CameDomoticUnofficialApiClientAuthenticationError,
-    CameDomoticUnofficialApiClientCommunicationError,
-    CameDomoticUnofficialApiClientError,
-)
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
+from .api import CameDomoticUnofficialApiClient
+from .api import CameDomoticUnofficialApiClientAuthenticationError
+from .api import CameDomoticUnofficialApiClientCommunicationError
+from .api import CameDomoticUnofficialApiClientError
+from .const import DEFAULT_SCAN_INTERVAL
+from .const import DOMAIN
+from .const import MIN_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
+        vol.Required(CONF_HOST): str,
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
+        vol.Optional(
+            CONF_SCAN_INTERVAL,
+            default=DEFAULT_SCAN_INTERVAL,
+        ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)),
     }
 )
+
+# TODO: Add the DHCP autodisccover step
+
+
+async def _async_test_credentials(
+    hass,
+    host: str,
+    username: str,
+    password: str,
+) -> str:
+    """Validate credentials and return the server keycode.
+
+    Raises CannotConnect or InvalidAuth on failure.
+    """
+    session = async_get_clientsession(hass)
+    client = CameDomoticUnofficialApiClient(host, username, password, session)
+    try:
+        await client.async_connect()
+        server_info = await client.async_get_server_info()
+        return server_info.keycode
+    except CameDomoticUnofficialApiClientAuthenticationError as err:
+        raise InvalidAuth from err
+    except CameDomoticUnofficialApiClientCommunicationError as err:
+        raise CannotConnect from err
+    except CameDomoticUnofficialApiClientError as err:
+        raise CannotConnect from err
+    finally:
+        await client.async_dispose()
 
 
 class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -47,46 +80,19 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
         return CameDomoticUnofficialOptionsFlowHandler()
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
-                await self._test_credentials(
-                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
-                )
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-
-            if not errors:
-                await self.async_set_unique_id(user_input[CONF_USERNAME])
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=user_input[CONF_USERNAME], data=user_input
-                )
-
-        return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-        )
-
-    async def async_step_reconfigure(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle reconfiguration of the integration."""
-        errors: dict[str, str] = {}
-        reconfigure_entry = self._get_reconfigure_entry()
-
-        if user_input is not None:
-            try:
-                await self._test_credentials(
-                    user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                keycode = await _async_test_credentials(
+                    self.hass,
+                    user_input[CONF_HOST],
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
                 )
             except CannotConnect:
                 errors["base"] = "cannot_connect"
@@ -96,10 +102,69 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
+                await self.async_set_unique_id(keycode)
+                self._abort_if_unique_id_configured()
+                data = {
+                    k: v
+                    for k, v in user_input.items()
+                    if k != CONF_SCAN_INTERVAL
+                }
+                options = {
+                    CONF_SCAN_INTERVAL: user_input.get(
+                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                    ),
+                }
+                return self.async_create_entry(
+                    title=user_input[CONF_HOST],
+                    data=data,
+                    options=options,
+                )
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=STEP_USER_DATA_SCHEMA,
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self,
+        user_input: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
+        """Handle reconfiguration of the integration."""
+        errors: dict[str, str] = {}
+        reconfigure_entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            try:
+                await _async_test_credentials(
+                    self.hass,
+                    user_input[CONF_HOST],
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
+                )
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception")
+                errors["base"] = "unknown"
+            else:
+                data = {
+                    k: v
+                    for k, v in user_input.items()
+                    if k != CONF_SCAN_INTERVAL
+                }
+                options = {
+                    CONF_SCAN_INTERVAL: user_input.get(
+                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                    ),
+                }
                 return self.async_update_reload_and_abort(
                     reconfigure_entry,
                     unique_id=reconfigure_entry.unique_id,
-                    data={**reconfigure_entry.data, **user_input},
+                    data={**reconfigure_entry.data, **data},
+                    options=options,
                     reason="reconfigure_successful",
                 )
 
@@ -108,52 +173,93 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(
+                        CONF_HOST,
+                        default=reconfigure_entry.data.get(CONF_HOST, ""),
+                    ): str,
+                    vol.Required(
                         CONF_USERNAME,
                         default=reconfigure_entry.data[CONF_USERNAME],
                     ): str,
                     vol.Required(CONF_PASSWORD): str,
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL,
+                        default=reconfigure_entry.options.get(
+                            CONF_SCAN_INTERVAL,
+                            DEFAULT_SCAN_INTERVAL,
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)
+                    ),
                 }
             ),
             errors=errors,
         )
-
-    async def _test_credentials(self, username: str, password: str) -> None:
-        """Validate credentials."""
-        session = async_get_clientsession(self.hass)
-        client = CameDomoticUnofficialApiClient(username, password, session)
-        try:
-            await client.async_get_data()
-        except CameDomoticUnofficialApiClientAuthenticationError as err:
-            raise InvalidAuth from err
-        except CameDomoticUnofficialApiClientCommunicationError as err:
-            raise CannotConnect from err
-        except CameDomoticUnofficialApiClientError as err:
-            raise CannotConnect from err
 
 
 class CameDomoticUnofficialOptionsFlowHandler(OptionsFlow):
     """Config flow options handler for came_domotic_unofficial."""
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self,
+        user_input: dict[str, Any] | None = None,
     ) -> ConfigFlowResult:
         """Manage the options."""
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            options = self.config_entry.options | user_input
-            return self.async_create_entry(title="", data=options)
+            host = user_input[CONF_HOST]
+            username = user_input[CONF_USERNAME]
+            password = user_input[CONF_PASSWORD]
+            scan_interval = user_input[CONF_SCAN_INTERVAL]
+
+            try:
+                await _async_test_credentials(self.hass, host, username, password)
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception")
+                errors["base"] = "unknown"
+
+            if not errors:
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={
+                        **self.config_entry.data,
+                        CONF_HOST: host,
+                        CONF_USERNAME: username,
+                        CONF_PASSWORD: password,
+                    },
+                )
+                return self.async_create_entry(
+                    title="",
+                    data={CONF_SCAN_INTERVAL: scan_interval},
+                )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required(
+                        CONF_HOST,
+                        default=self.config_entry.data.get(CONF_HOST, ""),
+                    ): str,
+                    vol.Required(
+                        CONF_USERNAME,
+                        default=self.config_entry.data.get(CONF_USERNAME, ""),
+                    ): str,
+                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(
                         CONF_SCAN_INTERVAL,
                         default=self.config_entry.options.get(
-                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                            CONF_SCAN_INTERVAL,
+                            DEFAULT_SCAN_INTERVAL,
                         ),
                     ): vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL)),
                 }
             ),
+            errors=errors,
         )
 
 

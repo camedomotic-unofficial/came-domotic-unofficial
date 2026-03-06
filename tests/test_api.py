@@ -1,8 +1,15 @@
 """Tests for CAME Domotic Unofficial API client."""
-import asyncio
+from __future__ import annotations
 
-import aiohttp
+from unittest.mock import AsyncMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
 import pytest
+from aiocamedomotic.errors import CameDomoticAuthError
+from aiocamedomotic.errors import CameDomoticError
+from aiocamedomotic.errors import CameDomoticServerError
+from aiocamedomotic.errors import CameDomoticServerNotFoundError
 from custom_components.came_domotic_unofficial.api import (
     CameDomoticUnofficialApiClient,
     CameDomoticUnofficialApiClientAuthenticationError,
@@ -11,75 +18,202 @@ from custom_components.came_domotic_unofficial.api import (
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .conftest import API_URL
+_PATCH_ASYNC_CREATE = (
+    "custom_components.came_domotic_unofficial.api.CameDomoticAPI.async_create"
+)
 
 
-async def test_api_get_data(hass, aioclient_mock):
-    """Test successful GET request."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
-
-    aioclient_mock.get(API_URL, json={"test": "test"})
-    assert await api.async_get_data() == {"test": "test"}
+def _make_client(hass):
+    """Create an API client for testing."""
+    session = async_get_clientsession(hass)
+    return CameDomoticUnofficialApiClient("192.168.1.1", "user", "pass", session)
 
 
-async def test_api_set_title(hass, aioclient_mock):
-    """Test successful PATCH request."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
+def _mock_server_info():
+    """Create a mock ServerInfo object."""
+    info = MagicMock()
+    info.keycode = "AA:BB:CC:DD:EE:FF"
+    info.software_version = "1.2.3"
+    info.server_type = "ETI/Domo"
+    info.board = "board_v1"
+    return info
 
-    aioclient_mock.patch(API_URL, json={"title": "test"})
-    result = await api.async_set_title("test")
-    assert result == {"title": "test"}
+
+# --- async_connect ---
 
 
-async def test_api_timeout(hass, aioclient_mock):
-    """Test API timeout raises CommunicationError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
+async def test_async_connect_success(hass):
+    """Test successful connection creates the API instance."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
 
-    aioclient_mock.get(API_URL, exc=asyncio.TimeoutError)
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    assert client._api is mock_api
+
+
+async def test_async_connect_server_not_found(hass):
+    """Test CameDomoticServerNotFoundError raises CommunicationError."""
+    client = _make_client(hass)
+
+    with (
+        patch(
+            _PATCH_ASYNC_CREATE,
+            side_effect=CameDomoticServerNotFoundError("not found"),
+        ),
+        pytest.raises(CameDomoticUnofficialApiClientCommunicationError),
+    ):
+        await client.async_connect()
+
+
+async def test_async_connect_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+
+    with (
+        patch(
+            _PATCH_ASYNC_CREATE,
+            side_effect=CameDomoticError("generic"),
+        ),
+        pytest.raises(CameDomoticUnofficialApiClientError),
+    ):
+        await client.async_connect()
+
+
+# --- async_get_server_info ---
+
+
+async def test_async_get_server_info_success(hass):
+    """Test successful server info retrieval."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_info = _mock_server_info()
+    mock_api.async_get_server_info.return_value = mock_info
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    result = await client.async_get_server_info()
+    assert result is mock_info
+
+
+async def test_async_get_server_info_auth_error(hass):
+    """Test CameDomoticAuthError raises AuthenticationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticAuthError("bad creds")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticUnofficialApiClientAuthenticationError):
+        await client.async_get_server_info()
+
+
+async def test_async_get_server_info_server_error(hass):
+    """Test CameDomoticServerError raises CommunicationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticServerError("server err")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
     with pytest.raises(CameDomoticUnofficialApiClientCommunicationError):
-        await api.async_get_data()
+        await client.async_get_server_info()
 
 
-async def test_api_client_error(hass, aioclient_mock):
-    """Test aiohttp.ClientError raises CommunicationError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
+async def test_async_get_server_info_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticError("generic")
 
-    aioclient_mock.get(API_URL, exc=aiohttp.ClientError)
-    with pytest.raises(CameDomoticUnofficialApiClientCommunicationError):
-        await api.async_get_data()
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
 
-
-async def test_api_parse_error(hass, aioclient_mock):
-    """Test unexpected exception raises ApiClientError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
-
-    aioclient_mock.get(API_URL, exc=TypeError)
     with pytest.raises(CameDomoticUnofficialApiClientError):
-        await api.async_get_data()
+        await client.async_get_server_info()
 
 
-async def test_api_authentication_error_401(hass, aioclient_mock):
-    """Test 401 response raises AuthenticationError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
+# --- async_get_data ---
 
-    aioclient_mock.get(API_URL, status=401)
+
+async def test_async_get_data_success(hass):
+    """Test successful data retrieval returns expected dict."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.return_value = _mock_server_info()
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    result = await client.async_get_data()
+    assert result == {
+        "keycode": "AA:BB:CC:DD:EE:FF",
+        "software_version": "1.2.3",
+        "server_type": "ETI/Domo",
+        "board": "board_v1",
+    }
+
+
+async def test_async_get_data_auth_error(hass):
+    """Test CameDomoticAuthError raises AuthenticationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticAuthError("bad creds")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
     with pytest.raises(CameDomoticUnofficialApiClientAuthenticationError):
-        await api.async_get_data()
+        await client.async_get_data()
 
 
-async def test_api_authentication_error_403(hass, aioclient_mock):
-    """Test 403 response raises AuthenticationError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
+async def test_async_get_data_server_error(hass):
+    """Test CameDomoticServerError raises CommunicationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticServerError("server err")
 
-    aioclient_mock.get(API_URL, status=403)
-    with pytest.raises(CameDomoticUnofficialApiClientAuthenticationError):
-        await api.async_get_data()
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
 
-
-async def test_api_set_title_timeout(hass, aioclient_mock):
-    """Test async_set_title timeout raises CommunicationError."""
-    api = CameDomoticUnofficialApiClient("test", "test", async_get_clientsession(hass))
-
-    aioclient_mock.patch(API_URL, exc=asyncio.TimeoutError)
     with pytest.raises(CameDomoticUnofficialApiClientCommunicationError):
-        await api.async_set_title("test")
+        await client.async_get_data()
+
+
+async def test_async_get_data_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_server_info.side_effect = CameDomoticError("generic")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticUnofficialApiClientError):
+        await client.async_get_data()
+
+
+# --- async_dispose ---
+
+
+async def test_async_dispose(hass):
+    """Test dispose cleans up the API connection."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    await client.async_dispose()
+    mock_api.async_dispose.assert_awaited_once()
+    assert client._api is None
+
+
+async def test_async_dispose_no_api(hass):
+    """Test dispose without prior connect does not raise."""
+    client = _make_client(hass)
+    await client.async_dispose()

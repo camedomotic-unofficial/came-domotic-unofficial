@@ -1,4 +1,12 @@
 """Constants for CAME Domotic Unofficial tests."""
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_HOST
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_USERNAME
 
-MOCK_CONFIG = {CONF_USERNAME: "test_username", CONF_PASSWORD: "test_password"}
+MOCK_CONFIG = {
+    CONF_HOST: "192.168.1.100",
+    CONF_USERNAME: "test_username",
+    CONF_PASSWORD: "test_password",
+}
+
+MOCK_KEYCODE = "AA:BB:CC:DD:EE:FF"

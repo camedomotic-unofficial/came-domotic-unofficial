@@ -1,18 +1,17 @@
 """CAME Domotic Unofficial API Client."""
 from __future__ import annotations
 
-import asyncio
 import logging
-import socket
 from typing import Any
 
 import aiohttp
-
-TIMEOUT = 10
+from aiocamedomotic import CameDomoticAPI
+from aiocamedomotic.errors import CameDomoticAuthError
+from aiocamedomotic.errors import CameDomoticError
+from aiocamedomotic.errors import CameDomoticServerError
+from aiocamedomotic.errors import CameDomoticServerNotFoundError
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
-
-HEADERS = {"Content-type": "application/json; charset=UTF-8"}
 
 
 class CameDomoticUnofficialApiClientError(Exception):
@@ -20,81 +19,95 @@ class CameDomoticUnofficialApiClientError(Exception):
 
 
 class CameDomoticUnofficialApiClientCommunicationError(
-    CameDomoticUnofficialApiClientError
+    CameDomoticUnofficialApiClientError,
 ):
     """Exception for communication errors."""
 
 
 class CameDomoticUnofficialApiClientAuthenticationError(
-    CameDomoticUnofficialApiClientError
+    CameDomoticUnofficialApiClientError,
 ):
     """Exception for authentication errors."""
 
 
-def _verify_response_or_raise(response: aiohttp.ClientResponse) -> None:
-    """Verify that the response is valid."""
-    if response.status in (401, 403):
-        msg = "Invalid credentials"
-        raise CameDomoticUnofficialApiClientAuthenticationError(msg)
-    response.raise_for_status()
-
-
 class CameDomoticUnofficialApiClient:
-    """CAME Domotic Unofficial API Client."""
+    """CAME Domotic Unofficial API Client wrapping aiocamedomotic."""
 
     def __init__(
-        self, username: str, password: str, session: aiohttp.ClientSession
+        self,
+        host: str,
+        username: str,
+        password: str,
+        websession: aiohttp.ClientSession,
     ) -> None:
         """Initialize the API client."""
+        self._host = host
         self._username = username
         self._password = password
-        self._session = session
+        self._websession = websession
+        self._api: CameDomoticAPI | None = None
 
-    async def async_get_data(self) -> Any:
-        """Get data from the API."""
-        url = "https://jsonplaceholder.typicode.com/posts/1"
-        return await self._api_wrapper("get", url)
-
-    async def async_set_title(self, value: str) -> Any:
-        """Set title via the API."""
-        url = "https://jsonplaceholder.typicode.com/posts/1"
-        return await self._api_wrapper(
-            "patch", url, data={"title": value}, headers=HEADERS
-        )
-
-    async def _api_wrapper(
-        self,
-        method: str,
-        url: str,
-        data: dict | None = None,
-        headers: dict | None = None,
-    ) -> Any:
-        """Get information from the API."""
+    async def async_connect(self) -> None:
+        """Create the CameDomoticAPI instance (validates host reachability)."""
         try:
-            async with asyncio.timeout(TIMEOUT):
-                response = await self._session.request(
-                    method=method,
-                    url=url,
-                    headers=headers or {},
-                    json=data,
-                )
-                _verify_response_or_raise(response)
-                return await response.json()
-
-        except TimeoutError as exception:
+            self._api = await CameDomoticAPI.async_create(
+                self._host,
+                self._username,
+                self._password,
+                websession=self._websession,
+                close_websession_on_disposal=False,
+            )
+        except CameDomoticServerNotFoundError as err:
             raise CameDomoticUnofficialApiClientCommunicationError(
-                f"Timeout error fetching information from {url}"
-            ) from exception
-
-        except (aiohttp.ClientError, socket.gaierror) as exception:
-            raise CameDomoticUnofficialApiClientCommunicationError(
-                f"Error fetching information from {url}"
-            ) from exception
-
-        except CameDomoticUnofficialApiClientAuthenticationError:
-            raise
-
-        except Exception as exception:
+                f"Unable to reach server at {self._host}",
+            ) from err
+        except CameDomoticError as err:
             raise CameDomoticUnofficialApiClientError(
-                f"Error parsing information from {url}"
-            ) from exception
+                f"Error connecting to server at {self._host}",
+            ) from err
+
+    async def async_get_server_info(self) -> Any:
+        """Get server info (triggers lazy auth on first call)."""
+        try:
+            return await self._api.async_get_server_info()
+        except CameDomoticAuthError as err:
+            raise CameDomoticUnofficialApiClientAuthenticationError(
+                "Invalid credentials",
+            ) from err
+        except CameDomoticServerError as err:
+            raise CameDomoticUnofficialApiClientCommunicationError(
+                "Server error while fetching server info",
+            ) from err
+        except CameDomoticError as err:
+            raise CameDomoticUnofficialApiClientError(
+                "Error fetching server info",
+            ) from err
+
+    async def async_get_data(self) -> dict[str, Any]:
+        """Fetch data from the CAME Domotic server."""
+        try:
+            server_info = await self._api.async_get_server_info()
+            return {
+                "keycode": server_info.keycode,
+                "software_version": server_info.software_version,
+                "server_type": server_info.server_type,
+                "board": server_info.board,
+            }
+        except CameDomoticAuthError as err:
+            raise CameDomoticUnofficialApiClientAuthenticationError(
+                "Invalid credentials",
+            ) from err
+        except CameDomoticServerError as err:
+            raise CameDomoticUnofficialApiClientCommunicationError(
+                "Server error while fetching data",
+            ) from err
+        except CameDomoticError as err:
+            raise CameDomoticUnofficialApiClientError(
+                "Error fetching data",
+            ) from err
+
+    async def async_dispose(self) -> None:
+        """Clean up the API connection."""
+        if self._api:
+            await self._api.async_dispose()
+            self._api = None
