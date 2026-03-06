@@ -1,0 +1,13 @@
+{
+  "domain": "came_domotic_unofficial",
+  "name": "CAME Domotic Unofficial",
+  "documentation": "https://github.com/camedomotic-unofficial/came-domotic-unofficial",
+  "issue_tracker": "https://github.com/camedomotic-unofficial/came-domotic-unofficial/issues",
+  "dependencies": [],
+  "config_flow": true,
+  "single_config_entry": true,
+  "codeowners": ["@camedomotic-unofficial"],
+  "requirements": [],
+  "iot_class": "cloud_polling",
+  "version": "0.1.0"
+}

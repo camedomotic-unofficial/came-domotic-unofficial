@@ -1,0 +1,41 @@
+{
+  "config": {
+    "title": "CAME Domotic Unofficial",
+    "step": {
+      "user": {
+        "title": "CAME Domotic Unofficial",
+        "description": "If you need help with the configuration have a look here: https://github.com/camedomotic-unofficial/came-domotic-unofficial",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect.",
+      "invalid_auth": "Invalid authentication.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Device is already configured.",
+      "reconfigure_successful": "Reconfiguration successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan Interval (seconds)"
+        },
+        "description": "Configure options.",
+        "title": "CAME Domotic Unofficial Options"
+      }
+    }
+  }
+}

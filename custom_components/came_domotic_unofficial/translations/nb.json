@@ -1,0 +1,41 @@
+{
+  "config": {
+    "title": "CAME Domotic Unofficial",
+    "step": {
+      "user": {
+        "title": "CAME Domotic Unofficial",
+        "description": "Hvis du trenger hjep til konfigurasjon ta en titt her: https://github.com/camedomotic-unofficial/came-domotic-unofficial",
+        "data": {
+          "username": "Brukernavn",
+          "password": "Passord"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "username": "Brukernavn",
+          "password": "Passord"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kunne ikke koble til.",
+      "invalid_auth": "Ugyldig autentisering.",
+      "unknown": "Uventet feil."
+    },
+    "abort": {
+      "already_configured": "Enheten er allerede konfigurert.",
+      "reconfigure_successful": "Rekonfigurering vellykket."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Skanneintervall (sekunder)"
+        },
+        "description": "Konfigurer alternativer.",
+        "title": "CAME Domotic Unofficial Alternativer"
+      }
+    }
+  }
+}
