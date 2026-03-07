@@ -42,11 +42,14 @@ async def test_coordinator_auth_error_raises_config_entry_auth_failed(
 
     coordinator = config_entry.runtime_data.coordinator
 
-    with patch.object(
-        coordinator.api,
-        "async_get_data",
-        side_effect=CameDomoticUnofficialApiClientAuthenticationError("Bad auth"),
-    ), pytest.raises(ConfigEntryAuthFailed):
+    with (
+        patch.object(
+            coordinator.api,
+            "async_get_data",
+            side_effect=CameDomoticUnofficialApiClientAuthenticationError("Bad auth"),
+        ),
+        pytest.raises(ConfigEntryAuthFailed),
+    ):
         await coordinator._async_update_data()
 
 
@@ -62,9 +65,12 @@ async def test_coordinator_communication_error_raises_update_failed(
 
     coordinator = config_entry.runtime_data.coordinator
 
-    with patch.object(
-        coordinator.api,
-        "async_get_data",
-        side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
-    ), pytest.raises(UpdateFailed):
+    with (
+        patch.object(
+            coordinator.api,
+            "async_get_data",
+            side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
+        ),
+        pytest.raises(UpdateFailed),
+    ):
         await coordinator._async_update_data()

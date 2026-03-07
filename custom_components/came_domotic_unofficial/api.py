@@ -93,7 +93,7 @@ class CameDomoticUnofficialApiClient:
         if self._api is None:
             raise CameDomoticUnofficialApiClientError("Not initialized")
         try:
-            return await self._api.async_get_thermo_zones()
+            return await self._api.async_get_thermo_zones()  # type: ignore[no-any-return]
         except CameDomoticAuthError as err:
             raise CameDomoticUnofficialApiClientAuthenticationError(
                 "Invalid credentials",

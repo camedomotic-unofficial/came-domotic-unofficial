@@ -83,5 +83,5 @@ async def test_remove_config_entry_device(hass, bypass_get_data):
     await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
 
-    result = await async_remove_config_entry_device(hass, config_entry, None)
+    result = await async_remove_config_entry_device(hass, config_entry, None)  # type: ignore[arg-type]
     assert result is True

@@ -10,5 +10,8 @@ venv
 config/
 !config/configuration.yaml.example
 
+# Node
+node_modules/
+
 # Other integrations examples
 examples/

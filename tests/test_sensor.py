@@ -14,7 +14,7 @@ from custom_components.came_domotic_unofficial.const import DOMAIN
 from .const import MOCK_CONFIG
 
 _API_CLIENT = (
-    "custom_components.came_domotic_unofficial.api." "CameDomoticUnofficialApiClient"
+    "custom_components.came_domotic_unofficial.api.CameDomoticUnofficialApiClient"
 )
 
 

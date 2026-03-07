@@ -28,7 +28,7 @@ from custom_components.came_domotic_unofficial.const import (
 from .const import MOCK_CONFIG, MOCK_KEYCODE
 
 _API_CLIENT = (
-    "custom_components.came_domotic_unofficial.api." "CameDomoticUnofficialApiClient"
+    "custom_components.came_domotic_unofficial.api.CameDomoticUnofficialApiClient"
 )
 
 MOCK_USER_INPUT = {**MOCK_CONFIG, CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL}

@@ -14,7 +14,7 @@ from .const import MOCK_KEYCODE
 pytest_plugins = "pytest_homeassistant_custom_component"
 
 _API_CLIENT = (
-    "custom_components.came_domotic_unofficial.api." "CameDomoticUnofficialApiClient"
+    "custom_components.came_domotic_unofficial.api.CameDomoticUnofficialApiClient"
 )
 
 

@@ -60,7 +60,7 @@ async def _async_test_credentials(
     try:
         await client.async_connect()
         server_info = await client.async_get_server_info()
-        return server_info.keycode
+        return server_info.keycode  # type: ignore[no-any-return]
     except CameDomoticUnofficialApiClientAuthenticationError as err:
         raise InvalidAuth from err
     except CameDomoticUnofficialApiClientCommunicationError as err:

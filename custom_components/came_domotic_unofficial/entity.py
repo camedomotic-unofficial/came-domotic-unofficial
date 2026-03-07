@@ -24,11 +24,12 @@ class CameDomoticUnofficialEntity(
     ) -> None:
         """Initialize."""
         super().__init__(coordinator)
+        assert coordinator.config_entry is not None  # noqa: S101  # nosec B101
         entry_id = coordinator.config_entry.entry_id
         self._attr_unique_id = f"{entry_id}_{entity_key}" if entity_key else entry_id
         self._attr_device_info = DeviceInfo(
             name=f"CAME Domotic ({coordinator.hass.config.location_name})",
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+            identifiers={(DOMAIN, entry_id)},
             hw_version=coordinator.data.get("board"),
             manufacturer=MANUFACTURER,
             model=f"Server type: {coordinator.data.get('server_type')} - Board: {coordinator.data.get('board')}",
