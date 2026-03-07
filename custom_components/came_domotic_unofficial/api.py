@@ -119,6 +119,7 @@ class CameDomoticUnofficialApiClient:
                 "software_version": server_info.swver,
                 "server_type": server_info.type,
                 "board": server_info.board,
+                "serial_number": server_info.serial,
                 "thermo_zones": thermo_zones,
             }
         except CameDomoticAuthError as err:

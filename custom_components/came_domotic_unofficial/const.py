@@ -7,6 +7,7 @@ NAME = "CAME Domotic Unofficial"
 DOMAIN = "came_domotic_unofficial"
 
 ATTRIBUTION = "Data provided by CAME Domotic"
+MANUFACTURER = "CAME"
 
 # Icons
 ICON = "mdi:home-automation"

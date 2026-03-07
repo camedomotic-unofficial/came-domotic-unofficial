@@ -38,6 +38,7 @@ MOCK_API_DATA = {
     "software_version": "1.2.3",
     "server_type": "ETI/Domo",
     "board": "board_v1",
+    "serial_number": "0011FFEE",
     "thermo_zones": MOCK_THERMO_ZONES,
 }
 
@@ -49,6 +50,7 @@ def _mock_server_info():
     info.swver = "1.2.3"
     info.type = "ETI/Domo"
     info.board = "board_v1"
+    info.serial = "0011FFEE"
     return info
 
 

@@ -115,6 +115,7 @@ async def test_no_thermo_zones(hass):
         "software_version": "1.2.3",
         "server_type": "ETI/Domo",
         "board": "board_v1",
+        "serial_number": "0011FFEE",
         "thermo_zones": [],
     }
     config_entry = await _setup_entry(hass, mock_data)
@@ -135,6 +136,7 @@ async def test_thermo_zone_sensor_zone_not_found(hass):
         "software_version": "1.2.3",
         "server_type": "ETI/Domo",
         "board": "board_v1",
+        "serial_number": "0011FFEE",
         "thermo_zones": [_mock_thermo_zone(1, "Living Room", 20.0)],
     }
     updated_data = {
@@ -142,6 +144,7 @@ async def test_thermo_zone_sensor_zone_not_found(hass):
         "software_version": "1.2.3",
         "server_type": "ETI/Domo",
         "board": "board_v1",
+        "serial_number": "0011FFEE",
         "thermo_zones": [],
     }
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
