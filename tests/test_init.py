@@ -1,5 +1,7 @@
 """Test CAME Domotic Unofficial setup process."""
 
+from unittest.mock import patch
+
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -85,3 +87,23 @@ async def test_remove_config_entry_device(hass, bypass_get_data):
 
     result = await async_remove_config_entry_device(hass, config_entry, None)  # type: ignore[arg-type]
     assert result is True
+
+
+async def test_unload_entry_failure(hass, bypass_get_data):
+    """Test unload when platform unload fails skips API disposal."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        return_value=False,
+    ):
+        result = await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert result is False

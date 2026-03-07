@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -17,6 +18,8 @@ from . import CameDomoticUnofficialConfigEntry
 from .coordinator import CameDomoticUnofficialDataUpdateCoordinator
 from .entity import CameDomoticUnofficialEntity
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -25,9 +28,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensor platform."""
     coordinator = entry.runtime_data.coordinator
+    zones = coordinator.data.get("thermo_zones", [])
+    _LOGGER.debug("Setting up %d thermo zone sensor(s)", len(zones))
     async_add_entities(
         CameDomoticThermoZoneSensor(coordinator, zone.act_id, zone.name)
-        for zone in coordinator.data.get("thermo_zones", [])
+        for zone in zones
     )
 
 
@@ -55,6 +60,9 @@ class CameDomoticThermoZoneSensor(CameDomoticUnofficialEntity, SensorEntity):
         for zone in self.coordinator.data.get("thermo_zones", []):
             if zone.act_id == self._act_id:
                 return zone
+        _LOGGER.warning(
+            "Thermo zone with act_id %d not found in coordinator data", self._act_id
+        )
         return None
 
     @property

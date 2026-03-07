@@ -53,6 +53,7 @@ class CameDomoticUnofficialApiClient:
 
     async def async_connect(self) -> None:
         """Create the CameDomoticAPI instance (validates host reachability)."""
+        _LOGGER.debug("Connecting to CAME server at %s", self._host)
         try:
             self._api = await CameDomoticAPI.async_create(
                 self._host,
@@ -62,13 +63,16 @@ class CameDomoticUnofficialApiClient:
                 close_websession_on_disposal=False,
             )
         except CameDomoticServerNotFoundError as err:
+            _LOGGER.debug("Server not found at %s", self._host)
             raise CameDomoticUnofficialApiClientCommunicationError(
                 f"Unable to reach server at {self._host}",
             ) from err
         except CameDomoticError as err:
+            _LOGGER.debug("Error connecting to server at %s: %s", self._host, err)
             raise CameDomoticUnofficialApiClientError(
                 f"Error connecting to server at {self._host}",
             ) from err
+        _LOGGER.debug("Successfully connected to CAME server at %s", self._host)
 
     async def async_get_server_info(self) -> ServerInfo:
         """Get server info (triggers lazy auth on first call)."""
@@ -112,9 +116,11 @@ class CameDomoticUnofficialApiClient:
         """Fetch data from the CAME Domotic server."""
         if self._api is None:
             raise CameDomoticUnofficialApiClientError("Not initialized")
+        _LOGGER.debug("Fetching data from CAME server")
         try:
             server_info = await self._api.async_get_server_info()
             thermo_zones = await self._api.async_get_thermo_zones()
+            _LOGGER.debug("Fetched data: %d thermo zone(s)", len(thermo_zones))
             return {
                 "keycode": server_info.keycode,
                 "software_version": server_info.swver,
@@ -124,20 +130,24 @@ class CameDomoticUnofficialApiClient:
                 "thermo_zones": thermo_zones,
             }
         except CameDomoticAuthError as err:
+            _LOGGER.warning("Authentication failed while fetching data")
             raise CameDomoticUnofficialApiClientAuthenticationError(
                 "Invalid credentials",
             ) from err
         except CameDomoticServerError as err:
+            _LOGGER.debug("Server error while fetching data: %s", err)
             raise CameDomoticUnofficialApiClientCommunicationError(
                 "Server error while fetching data",
             ) from err
         except CameDomoticError as err:
+            _LOGGER.debug("Error fetching data: %s", err)
             raise CameDomoticUnofficialApiClientError(
                 "Error fetching data",
             ) from err
 
     async def async_dispose(self) -> None:
         """Clean up the API connection."""
+        _LOGGER.debug("Disposing API connection")
         if self._api:
             await self._api.async_dispose()
             self._api = None

@@ -8,6 +8,7 @@ https://github.com/camedomotic-unofficial/came-domotic-unofficial
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME, Platform
@@ -17,6 +18,8 @@ from homeassistant.helpers.device_registry import DeviceEntry
 
 from .api import CameDomoticUnofficialApiClient
 from .coordinator import CameDomoticUnofficialDataUpdateCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -39,9 +42,12 @@ async def async_setup_entry(
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
 
+    _LOGGER.debug("Setting up CAME Domotic integration for host %s", host)
+
     session = async_get_clientsession(hass)
     client = CameDomoticUnofficialApiClient(host, username, password, session)
     await client.async_connect()
+    _LOGGER.debug("Connected to CAME server at %s", host)
 
     coordinator = CameDomoticUnofficialDataUpdateCoordinator(
         hass,
@@ -49,6 +55,7 @@ async def async_setup_entry(
         config_entry=entry,
     )
     await coordinator.async_config_entry_first_refresh()
+    _LOGGER.debug("Initial data refresh completed")
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
@@ -56,6 +63,7 @@ async def async_setup_entry(
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    _LOGGER.info("CAME Domotic integration setup complete for %s", host)
     return True
 
 
@@ -64,6 +72,7 @@ async def _async_update_listener(
     entry: CameDomoticUnofficialConfigEntry,
 ) -> None:
     """Handle config options update."""
+    _LOGGER.debug("Configuration options updated, reloading")
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -84,7 +93,11 @@ async def async_unload_entry(
     entry: CameDomoticUnofficialConfigEntry,
 ) -> bool:
     """Handle removal of an entry."""
+    _LOGGER.debug("Unloading CAME Domotic integration")
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         await entry.runtime_data.coordinator.api.async_dispose()
+        _LOGGER.info("CAME Domotic integration unloaded successfully")
+    else:
+        _LOGGER.warning("Failed to unload platforms, skipping API disposal")
     return unload_ok

@@ -55,11 +55,13 @@ async def _async_test_credentials(
 
     Raises CannotConnect or InvalidAuth on failure.
     """
+    _LOGGER.debug("Testing credentials for host %s", host)
     session = async_get_clientsession(hass)
     client = CameDomoticUnofficialApiClient(host, username, password, session)
     try:
         await client.async_connect()
         server_info = await client.async_get_server_info()
+        _LOGGER.debug("Credentials validated, server keycode: %s", server_info.keycode)
         return server_info.keycode
     except CameDomoticUnofficialApiClientAuthenticationError as err:
         raise InvalidAuth from err
@@ -98,8 +100,10 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                     user_input[CONF_PASSWORD],
                 )
             except CannotConnect:
+                _LOGGER.warning("Cannot connect to %s", user_input[CONF_HOST])
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
+                _LOGGER.warning("Invalid authentication for %s", user_input[CONF_HOST])
                 errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -113,6 +117,9 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
                 }
+                _LOGGER.info(
+                    "Configuration entry created for %s", user_input[CONF_HOST]
+                )
                 return self.async_create_entry(
                     title=f"CAME Domotic ({user_input[CONF_HOST]})",
                     data=data,
@@ -142,8 +149,15 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                     user_input[CONF_PASSWORD],
                 )
             except CannotConnect:
+                _LOGGER.warning(
+                    "Reconfigure: cannot connect to %s", user_input[CONF_HOST]
+                )
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
+                _LOGGER.warning(
+                    "Reconfigure: invalid authentication for %s",
+                    user_input[CONF_HOST],
+                )
                 errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -155,6 +169,9 @@ class CameDomoticUnofficialFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                     ),
                 }
+                _LOGGER.info(
+                    "Configuration entry updated for %s", user_input[CONF_HOST]
+                )
                 return self.async_update_reload_and_abort(
                     reconfigure_entry,
                     unique_id=reconfigure_entry.unique_id,
@@ -198,6 +215,10 @@ class CameDomoticUnofficialOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
+            _LOGGER.debug(
+                "Options updated: scan_interval=%ds",
+                user_input[CONF_SCAN_INTERVAL],
+            )
             return self.async_create_entry(
                 title="",
                 data={CONF_SCAN_INTERVAL: user_input[CONF_SCAN_INTERVAL]},

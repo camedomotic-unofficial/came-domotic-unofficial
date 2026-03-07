@@ -45,12 +45,17 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=poll_interval),
             config_entry=config_entry,
         )
+        _LOGGER.debug(
+            "Coordinator initialized with %ds polling interval", poll_interval
+        )
 
     async def _async_update_data(self) -> Any:
         """Update data via library."""
         try:
             return await self.api.async_get_data()
         except CameDomoticUnofficialApiClientAuthenticationError as exception:
+            _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
         except CameDomoticUnofficialApiClientError as exception:
+            _LOGGER.warning("Error updating data: %s", exception)
             raise UpdateFailed(exception) from exception
