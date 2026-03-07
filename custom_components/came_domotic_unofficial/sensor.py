@@ -34,6 +34,7 @@ async def async_setup_entry(
 class CameDomoticThermoZoneSensor(CameDomoticUnofficialEntity, SensorEntity):
     """Sensor for a CAME Domotic thermoregulation zone temperature."""
 
+    _attr_has_entity_name = False
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
