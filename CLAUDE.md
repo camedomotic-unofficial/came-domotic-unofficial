@@ -10,7 +10,10 @@ A Home Assistant custom integration for CAME Domotic devices. Distributed via HA
 - **IoT class**: local polling — communicates with a local CAME Domotic server
 - **Single config entry**: only one instance allowed
 - **API layer**: `api.py` is a wrapper around the `aiocamedomotic` library (not direct HTTP calls). The current placeholder code will be replaced with `aiocamedomotic` calls.
-- **aiocamedomotic docs**: `examples/aiocamedomotic-quickreference.md` (overview) and `examples/aiocamedomotic-fullreference.md` (detailed API). Always consult these files when working with `aiocamedomotic` usage in `api.py` or anywhere else in the integration.
+- **aiocamedomotic docs**: Fetch the up-to-date API reference from these remote URLs:
+  - Overview: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/master/llms.txt`
+  - Full reference: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/master/llms-full.txt`
+    Always consult these when working with `aiocamedomotic` usage in `api.py` or anywhere else in the integration.
 
 ## Commands
 

@@ -12,6 +12,7 @@ from aiocamedomotic.errors import (
     CameDomoticServerError,
     CameDomoticServerNotFoundError,
 )
+from aiocamedomotic.models import ServerInfo, ThermoZone
 import aiohttp
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
@@ -69,7 +70,7 @@ class CameDomoticUnofficialApiClient:
                 f"Error connecting to server at {self._host}",
             ) from err
 
-    async def async_get_server_info(self) -> Any:
+    async def async_get_server_info(self) -> ServerInfo:
         """Get server info (triggers lazy auth on first call)."""
         if self._api is None:
             raise CameDomoticUnofficialApiClientError("Not initialized")
@@ -88,12 +89,12 @@ class CameDomoticUnofficialApiClient:
                 "Error fetching server info",
             ) from err
 
-    async def async_get_thermo_zones(self) -> list:
+    async def async_get_thermo_zones(self) -> list[ThermoZone]:
         """Fetch thermoregulation zones from the CAME Domotic server."""
         if self._api is None:
             raise CameDomoticUnofficialApiClientError("Not initialized")
         try:
-            return await self._api.async_get_thermo_zones()  # type: ignore[no-any-return]
+            return await self._api.async_get_thermo_zones()
         except CameDomoticAuthError as err:
             raise CameDomoticUnofficialApiClientAuthenticationError(
                 "Invalid credentials",
