@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "CAME Domotic Unofficial",
-        "description": "If you need help with the configuration have a look here: https://github.com/camedomotic-unofficial/came-domotic-unofficial",
+        "description": "If you need help with the configuration have a look here: {documentation_url}",
         "data": {
           "host": "Host",
           "username": "Username",
