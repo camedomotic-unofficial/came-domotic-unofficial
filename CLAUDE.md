@@ -11,8 +11,8 @@ A Home Assistant custom integration for CAME Domotic devices. Distributed via HA
 - **Multiple config entries**: supports multiple instances (e.g., different local devices)
 - **API layer**: `api.py` is a wrapper around the `aiocamedomotic` library (not direct HTTP calls).
 - **aiocamedomotic docs**: Fetch the up-to-date API reference from these remote URLs:
-  - Overview: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/master/llms.txt`
-  - Full reference: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/master/llms-full.txt`
+  - Overview: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/main/llms.txt`
+  - Full reference: `https://raw.githubusercontent.com/camedomotic-unofficial/aiocamedomotic/refs/heads/main/llms-full.txt`
     Always consult these when working with `aiocamedomotic` usage in `api.py` or anywhere else in the integration.
 
 ## Commands
