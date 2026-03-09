@@ -11,9 +11,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import Any
 
-from aiocamedomotic.models import DeviceType, ThermoZone
+from aiocamedomotic.models import DeviceType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -30,11 +29,14 @@ from .const import (
     RECONNECT_DELAY,
     UPDATE_THROTTLE_DELAY,
 )
+from .models import CameDomoticServerData
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
+class CameDomoticUnofficialDataUpdateCoordinator(
+    DataUpdateCoordinator[CameDomoticServerData]
+):
     """Coordinator that manages push-based data updates via long polling.
 
     On first refresh, performs a full data fetch from the CAME server.
@@ -42,7 +44,8 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
     and pushes them to entities via async_set_updated_data().
     """
 
-    data: dict[str, Any]
+    config_entry: ConfigEntry
+    data: CameDomoticServerData
 
     def __init__(
         self,
@@ -68,14 +71,15 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
         self._long_poll_task: asyncio.Task[None] | None = None
         _LOGGER.debug("Coordinator initialized (push-based, no polling interval)")
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> CameDomoticServerData:
         """Perform a full data fetch from the CAME server.
 
         Called during initial setup (async_config_entry_first_refresh) and
         when a plant configuration change is detected.
         """
         try:
-            raw_data = await self.api.async_get_data()
+            server_info = await self.api.async_get_server_info()
+            thermo_zones = await self.api.async_get_thermo_zones()
         except CameDomoticUnofficialApiClientAuthenticationError as exception:
             _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
@@ -85,9 +89,12 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
 
         _LOGGER.debug(
             "Full data fetch complete: %d thermo zone(s)",
-            len(raw_data.get("thermo_zones", [])),
+            len(thermo_zones),
         )
-        return raw_data
+        return CameDomoticServerData(
+            server_info=server_info,
+            thermo_zones={z.act_id: z for z in thermo_zones},
+        )
 
     def start_long_poll(self) -> None:
         """Start the background long-polling task.
@@ -98,9 +105,10 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
         if self._long_poll_task is not None:
             _LOGGER.warning("Long-poll task already running, not starting another")
             return
-        self._long_poll_task = self.hass.async_create_background_task(
+        self._long_poll_task = self.config_entry.async_create_background_task(
+            self.hass,
             self._async_long_poll_loop(),
-            name=f"{DOMAIN}_long_poll_{self.config_entry.entry_id if self.config_entry else 'unknown'}",
+            name=f"{DOMAIN}_long_poll_{self.config_entry.entry_id}",
         )
         _LOGGER.info("Long-poll background task started")
 
@@ -143,8 +151,7 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning(
                     "Authentication failed in long-poll loop, triggering reauth"
                 )
-                if self.config_entry:
-                    self.config_entry.async_start_reauth(self.hass)
+                self.config_entry.async_start_reauth(self.hass)
                 return
             except CameDomoticUnofficialApiClientError as err:
                 _LOGGER.debug(
@@ -177,50 +184,41 @@ class CameDomoticUnofficialDataUpdateCoordinator(DataUpdateCoordinator):
                     )
             else:
                 # Incremental update: merge partial changes into current state
-                new_data = self._merge_updates(update_list)
-                self.async_set_updated_data(new_data)
+                self._merge_updates(update_list)
+                self.async_set_updated_data(self.data)
 
             # Throttle before next long-poll call
             await asyncio.sleep(UPDATE_THROTTLE_DELAY)
 
-    def _merge_updates(self, update_list) -> dict[str, Any]:
+    def _merge_updates(self, update_list) -> None:
         """Merge incremental device updates into the current coordinator data.
 
         For each ThermoZoneUpdate, finds the matching ThermoZone by act_id
         and merges the update's raw_data into the zone's raw_data. Only keys
         present in the update are overwritten; missing fields are preserved.
 
+        Mutates self.data in-place.
+
         Args:
             update_list: The UpdateList from async_get_updates().
-
-        Returns:
-            A new data dict with the merged state.
         """
-        data = dict(self.data)
-
         # Merge thermostat (thermo zone) updates
         thermo_updates = update_list.get_typed_by_device_type(DeviceType.THERMOSTAT)
         _LOGGER.debug(
             "Merging incremental updates: %d thermo zone update(s)",
             len(thermo_updates) if thermo_updates else 0,
         )
-        if thermo_updates:
-            zone_map: dict[int, ThermoZone] = {
-                z.act_id: z for z in data.get("thermo_zones", [])
-            }
-            for update in thermo_updates:
-                if update.act_id in zone_map:
-                    zone_map[update.act_id].raw_data.update(update.raw_data)
-                    _LOGGER.debug(
-                        "Applied update to thermo zone '%s' (act_id=%d)",
-                        update.name,
-                        update.act_id,
-                    )
-                else:
-                    _LOGGER.debug(
-                        "Received update for unknown thermo zone act_id=%d, ignoring",
-                        update.act_id,
-                    )
-            data["thermo_zones"] = list(zone_map.values())
-
-        return data
+        for update in thermo_updates:
+            zone = self.data.thermo_zones.get(update.act_id)
+            if zone is not None:
+                zone.raw_data.update(update.raw_data)
+                _LOGGER.debug(
+                    "Applied update to thermo zone '%s' (act_id=%d)",
+                    update.name,
+                    update.act_id,
+                )
+            else:
+                _LOGGER.debug(
+                    "Received update for unknown thermo zone act_id=%d, ignoring",
+                    update.act_id,
+                )

@@ -6,6 +6,9 @@ from homeassistant.config_entries import ConfigEntryState
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.came_domotic_unofficial import async_remove_config_entry_device
+from custom_components.came_domotic_unofficial.api import (
+    CameDomoticUnofficialApiClient,
+)
 from custom_components.came_domotic_unofficial.const import DOMAIN
 from custom_components.came_domotic_unofficial.coordinator import (
     CameDomoticUnofficialDataUpdateCoordinator,
@@ -27,6 +30,10 @@ async def test_setup_and_unload_entry(hass, bypass_get_data):
     assert isinstance(
         config_entry.runtime_data.coordinator,
         CameDomoticUnofficialDataUpdateCoordinator,
+    )
+    assert isinstance(
+        config_entry.runtime_data.client,
+        CameDomoticUnofficialApiClient,
     )
 
     # Unload the entry

@@ -139,65 +139,12 @@ async def test_async_get_server_info_generic_error(hass):
         await client.async_get_server_info()
 
 
-# --- async_get_data ---
-
-
-async def test_async_get_data_success(hass):
-    """Test successful data retrieval returns expected dict."""
+async def test_async_get_server_info_not_initialized(hass):
+    """Test async_get_server_info raises ApiClientError when not connected."""
     client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_server_info.return_value = _mock_server_info()
-    mock_zones = [MagicMock()]
-    mock_api.async_get_thermo_zones.return_value = mock_zones
 
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    result = await client.async_get_data()
-    assert result["keycode"] == "AA:BB:CC:DD:EE:FF"
-    assert result["software_version"] == "1.2.3"
-    assert result["server_type"] == "ETI/Domo"
-    assert result["board"] == "board_v1"
-    assert result["thermo_zones"] is mock_zones
-
-
-async def test_async_get_data_auth_error(hass):
-    """Test CameDomoticAuthError raises AuthenticationError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_server_info.side_effect = CameDomoticAuthError("bad creds")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticUnofficialApiClientAuthenticationError):
-        await client.async_get_data()
-
-
-async def test_async_get_data_server_error(hass):
-    """Test CameDomoticServerError raises CommunicationError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_server_info.side_effect = CameDomoticServerError("server err")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticUnofficialApiClientCommunicationError):
-        await client.async_get_data()
-
-
-async def test_async_get_data_generic_error(hass):
-    """Test CameDomoticError raises ApiClientError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_server_info.side_effect = CameDomoticError("generic")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticUnofficialApiClientError):
-        await client.async_get_data()
+    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
+        await client.async_get_server_info()
 
 
 # --- async_get_thermo_zones ---
@@ -264,47 +211,6 @@ async def test_async_get_thermo_zones_not_initialized(hass):
         await client.async_get_thermo_zones()
 
 
-# --- async_dispose ---
-
-
-async def test_async_dispose(hass):
-    """Test dispose cleans up the API connection."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    await client.async_dispose()
-    mock_api.async_dispose.assert_awaited_once()
-    assert client._api is None
-
-
-async def test_async_dispose_no_api(hass):
-    """Test dispose without prior connect does not raise."""
-    client = _make_client(hass)
-    await client.async_dispose()
-
-
-# --- not initialized guards ---
-
-
-async def test_async_get_server_info_not_initialized(hass):
-    """Test async_get_server_info raises ApiClientError when not connected."""
-    client = _make_client(hass)
-
-    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
-        await client.async_get_server_info()
-
-
-async def test_async_get_data_not_initialized(hass):
-    """Test async_get_data raises ApiClientError when not connected."""
-    client = _make_client(hass)
-
-    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
-        await client.async_get_data()
-
-
 # --- async_get_updates ---
 
 
@@ -368,3 +274,25 @@ async def test_async_get_updates_not_initialized(hass):
 
     with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
         await client.async_get_updates()
+
+
+# --- async_dispose ---
+
+
+async def test_async_dispose(hass):
+    """Test dispose cleans up the API connection."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    await client.async_dispose()
+    mock_api.async_dispose.assert_awaited_once()
+    assert client._api is None
+
+
+async def test_async_dispose_no_api(hass):
+    """Test dispose without prior connect does not raise."""
+    client = _make_client(hass)
+    await client.async_dispose()

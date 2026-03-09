@@ -8,6 +8,7 @@ from custom_components.came_domotic_unofficial.api import (
     CameDomoticUnofficialApiClientAuthenticationError,
     CameDomoticUnofficialApiClientCommunicationError,
 )
+from custom_components.came_domotic_unofficial.models import CameDomoticServerData
 
 from .const import MOCK_KEYCODE
 
@@ -75,16 +76,6 @@ MOCK_THERMO_ZONES = [
     ),
 ]
 
-# Mock data matching what async_get_data() returns from the CAME server
-MOCK_API_DATA = {
-    "keycode": MOCK_KEYCODE,
-    "software_version": "1.2.3",
-    "server_type": "ETI/Domo",
-    "board": "board_v1",
-    "serial_number": "0011FFEE",
-    "thermo_zones": MOCK_THERMO_ZONES,
-}
-
 
 def _mock_server_info():
     """Create a mock ServerInfo object."""
@@ -95,6 +86,14 @@ def _mock_server_info():
     info.board = "board_v1"
     info.serial = "0011FFEE"
     return info
+
+
+MOCK_SERVER_INFO = _mock_server_info()
+
+MOCK_SERVER_DATA = CameDomoticServerData(
+    server_info=MOCK_SERVER_INFO,
+    thermo_zones={z.act_id: z for z in MOCK_THERMO_ZONES},
+)
 
 
 @pytest.fixture(autouse=True)
@@ -108,7 +107,14 @@ def bypass_get_data_fixture():
     """Skip calls to get data from API and suppress long-poll task."""
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=MOCK_API_DATA),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=list(MOCK_THERMO_ZONES),
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_COORDINATOR}.start_long_poll"),
     ):
@@ -121,7 +127,7 @@ def error_get_data_fixture():
     with (
         patch(f"{_API_CLIENT}.async_connect"),
         patch(
-            f"{_API_CLIENT}.async_get_data",
+            f"{_API_CLIENT}.async_get_server_info",
             side_effect=CameDomoticUnofficialApiClientCommunicationError(
                 "Connection error"
             ),
@@ -138,7 +144,7 @@ def auth_error_get_data_fixture():
     with (
         patch(f"{_API_CLIENT}.async_connect"),
         patch(
-            f"{_API_CLIENT}.async_get_data",
+            f"{_API_CLIENT}.async_get_server_info",
             side_effect=CameDomoticUnofficialApiClientAuthenticationError(
                 "Invalid credentials"
             ),

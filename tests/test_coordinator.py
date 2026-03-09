@@ -22,8 +22,8 @@ from custom_components.came_domotic_unofficial.coordinator import (
     CameDomoticUnofficialDataUpdateCoordinator,
 )
 
-from .conftest import MOCK_API_DATA
-from .const import MOCK_CONFIG, MOCK_KEYCODE
+from .conftest import MOCK_THERMO_ZONES, _mock_server_info
+from .const import MOCK_CONFIG
 
 _API_CLIENT = (
     "custom_components.came_domotic_unofficial.api.CameDomoticUnofficialApiClient"
@@ -64,27 +64,20 @@ def _real_thermo_zone(
     )
 
 
-def _real_zone_api_data():
-    """Return mock API data using real ThermoZone objects."""
-    return {
-        "keycode": MOCK_KEYCODE,
-        "software_version": "1.2.3",
-        "server_type": "ETI/Domo",
-        "board": "board_v1",
-        "serial_number": "0011FFEE",
-        "thermo_zones": [
-            _real_thermo_zone(1, "Living Room", temperature=20.0, set_point=21.0),
-            _real_thermo_zone(
-                52,
-                "Bedroom",
-                temperature=19.5,
-                set_point=20.0,
-                mode=1,
-                floor_ind=1,
-                room_ind=1,
-            ),
-        ],
-    }
+def _real_zone_thermo_zones():
+    """Return a list of real ThermoZone objects for testing."""
+    return [
+        _real_thermo_zone(1, "Living Room", temperature=20.0, set_point=21.0),
+        _real_thermo_zone(
+            52,
+            "Bedroom",
+            temperature=19.5,
+            set_point=20.0,
+            mode=1,
+            floor_ind=1,
+            room_ind=1,
+        ),
+    ]
 
 
 # --- _async_update_data (initial full fetch) ---
@@ -100,14 +93,14 @@ async def test_coordinator_update_success(hass, bypass_get_data):
 
     coordinator = config_entry.runtime_data.coordinator
     assert coordinator.data is not None
-    assert coordinator.data["keycode"] == "AA:BB:CC:DD:EE:FF"
-    assert coordinator.data["software_version"] == "1.2.3"
+    assert coordinator.data.server_info.keycode == "AA:BB:CC:DD:EE:FF"
+    assert coordinator.data.server_info.swver == "1.2.3"
 
-    zones = coordinator.data["thermo_zones"]
+    zones = coordinator.data.thermo_zones
     assert len(zones) == 2
-    assert zones[0].act_id == 1
-    assert zones[0].temperature == 20.0
-    assert zones[1].act_id == 52
+    assert 1 in zones
+    assert zones[1].temperature == 20.0
+    assert 52 in zones
 
 
 async def test_coordinator_auth_error_raises_config_entry_auth_failed(
@@ -125,7 +118,7 @@ async def test_coordinator_auth_error_raises_config_entry_auth_failed(
     with (
         patch.object(
             coordinator.api,
-            "async_get_data",
+            "async_get_server_info",
             side_effect=CameDomoticUnofficialApiClientAuthenticationError("Bad auth"),
         ),
         pytest.raises(ConfigEntryAuthFailed),
@@ -148,7 +141,7 @@ async def test_coordinator_communication_error_raises_update_failed(
     with (
         patch.object(
             coordinator.api,
-            "async_get_data",
+            "async_get_server_info",
             side_effect=CameDomoticUnofficialApiClientCommunicationError("Timeout"),
         ),
         pytest.raises(UpdateFailed),
@@ -164,10 +157,16 @@ async def test_start_and_stop_long_poll(hass):
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
-    # Set up with API mocked but long-poll NOT suppressed
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=MOCK_API_DATA),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=list(MOCK_THERMO_ZONES),
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -193,7 +192,14 @@ async def test_start_long_poll_already_running(hass):
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=MOCK_API_DATA),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=list(MOCK_THERMO_ZONES),
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -235,11 +241,18 @@ async def test_long_poll_loop_incremental_update(hass):
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
-    real_api_data = _real_zone_api_data()
+    real_zones = _real_zone_thermo_zones()
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=real_api_data),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=real_zones,
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -278,7 +291,7 @@ async def test_long_poll_loop_incremental_update(hass):
         await coordinator._async_long_poll_loop()
 
     # Verify the temperature was updated via raw_data merge
-    zone = next(z for z in coordinator.data["thermo_zones"] if z.act_id == 1)
+    zone = coordinator.data.thermo_zones[1]
     assert zone.temperature == 22.5
     # Other fields should remain unchanged
     assert zone.set_point == 21.0
@@ -548,7 +561,14 @@ async def test_stop_long_poll_cancels_running_task(hass):
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=MOCK_API_DATA),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=list(MOCK_THERMO_ZONES),
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -576,11 +596,18 @@ async def test_merge_updates_known_zone(hass):
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
-    real_api_data = _real_zone_api_data()
+    real_zones = _real_zone_thermo_zones()
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=real_api_data),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=real_zones,
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -598,9 +625,9 @@ async def test_merge_updates_known_zone(hass):
     mock_update_list = MagicMock()
     mock_update_list.get_typed_by_device_type.return_value = [mock_update]
 
-    result = coordinator._merge_updates(mock_update_list)
+    coordinator._merge_updates(mock_update_list)
 
-    zone = next(z for z in result["thermo_zones"] if z.act_id == 1)
+    zone = coordinator.data.thermo_zones[1]
     assert zone.temperature == 25.0
     # Original set_point should be preserved
     assert zone.set_point == 21.0
@@ -611,11 +638,18 @@ async def test_merge_updates_unknown_zone_ignored(hass):
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
-    real_api_data = _real_zone_api_data()
+    real_zones = _real_zone_thermo_zones()
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=real_api_data),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=real_zones,
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -630,10 +664,10 @@ async def test_merge_updates_unknown_zone_ignored(hass):
     mock_update_list = MagicMock()
     mock_update_list.get_typed_by_device_type.return_value = [mock_update]
 
-    result = coordinator._merge_updates(mock_update_list)
+    coordinator._merge_updates(mock_update_list)
 
     # All original zones should still be present
-    assert len(result["thermo_zones"]) == 2
+    assert len(coordinator.data.thermo_zones) == 2
 
 
 async def test_merge_updates_preserves_fields_not_in_update(hass):
@@ -641,11 +675,18 @@ async def test_merge_updates_preserves_fields_not_in_update(hass):
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
-    real_api_data = _real_zone_api_data()
+    real_zones = _real_zone_thermo_zones()
 
     with (
         patch(f"{_API_CLIENT}.async_connect"),
-        patch(f"{_API_CLIENT}.async_get_data", return_value=real_api_data),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_thermo_zones",
+            return_value=real_zones,
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -663,8 +704,8 @@ async def test_merge_updates_preserves_fields_not_in_update(hass):
     mock_update_list = MagicMock()
     mock_update_list.get_typed_by_device_type.return_value = [mock_update]
 
-    result = coordinator._merge_updates(mock_update_list)
-    zone = next(z for z in result["thermo_zones"] if z.act_id == 1)
+    coordinator._merge_updates(mock_update_list)
+    zone = coordinator.data.thermo_zones[1]
 
     assert zone.temperature == 30.0
     assert zone.set_point == 21.0  # preserved

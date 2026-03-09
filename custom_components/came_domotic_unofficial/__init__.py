@@ -31,6 +31,7 @@ class RuntimeData:
     """Class to hold runtime data."""
 
     coordinator: CameDomoticUnofficialDataUpdateCoordinator
+    client: CameDomoticUnofficialApiClient
 
 
 async def async_setup_entry(
@@ -64,7 +65,7 @@ async def async_setup_entry(
     # Start the long-polling background task for real-time updates
     coordinator.start_long_poll()
 
-    entry.runtime_data = RuntimeData(coordinator)
+    entry.runtime_data = RuntimeData(coordinator=coordinator, client=client)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -100,7 +101,7 @@ async def async_unload_entry(
 
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        await entry.runtime_data.coordinator.api.async_dispose()
+        await entry.runtime_data.client.async_dispose()
         _LOGGER.info("CAME Domotic integration unloaded successfully")
     else:
         _LOGGER.warning("Failed to unload platforms, skipping API disposal")
