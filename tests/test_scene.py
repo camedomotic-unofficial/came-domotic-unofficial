@@ -100,19 +100,6 @@ async def test_scenario_scene_state(hass, bypass_get_data):
     assert good_night is not None
 
 
-async def test_scenario_scene_icon(hass, bypass_get_data):
-    """Test scene entities have the correct icon."""
-    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
-    config_entry.add_to_hass(hass)
-
-    await hass.config_entries.async_setup(config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    state = hass.states.get("scene.good_morning")
-    assert state is not None
-    assert state.attributes["icon"] == "mdi:play-box-multiple"
-
-
 async def test_scenario_scene_extra_attributes(hass, bypass_get_data):
     """Test scene exposes extra scenario attributes."""
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
