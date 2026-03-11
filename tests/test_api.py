@@ -772,3 +772,67 @@ async def test_async_set_light_status_not_initialized(hass):
 
     with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
         await client.async_set_light_status(mock_light, LightStatus.ON)
+
+
+# --- async_get_digital_inputs ---
+
+
+async def test_async_get_digital_inputs_success(hass):
+    """Test successful digital inputs retrieval."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_digital_inputs = [MagicMock(), MagicMock()]
+    mock_api.async_get_digital_inputs.return_value = mock_digital_inputs
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    result = await client.async_get_digital_inputs()
+    assert result is mock_digital_inputs
+
+
+async def test_async_get_digital_inputs_auth_error(hass):
+    """Test CameDomoticAuthError raises AuthenticationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_digital_inputs.side_effect = CameDomoticAuthError("bad creds")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticUnofficialApiClientAuthenticationError):
+        await client.async_get_digital_inputs()
+
+
+async def test_async_get_digital_inputs_server_error(hass):
+    """Test CameDomoticServerError raises CommunicationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_digital_inputs.side_effect = CameDomoticServerError("server err")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticUnofficialApiClientCommunicationError):
+        await client.async_get_digital_inputs()
+
+
+async def test_async_get_digital_inputs_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_digital_inputs.side_effect = CameDomoticError("generic")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticUnofficialApiClientError):
+        await client.async_get_digital_inputs()
+
+
+async def test_async_get_digital_inputs_not_initialized(hass):
+    """Test async_get_digital_inputs raises ApiClientError when not connected."""
+    client = _make_client(hass)
+
+    with pytest.raises(CameDomoticUnofficialApiClientError, match="Not initialized"):
+        await client.async_get_digital_inputs()

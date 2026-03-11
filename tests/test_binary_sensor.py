@@ -1,0 +1,229 @@
+"""Test CAME Domotic Unofficial binary sensor platform."""
+
+from __future__ import annotations
+
+from unittest.mock import patch
+
+from aiocamedomotic.models import DigitalInputStatus
+from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.came_domotic_unofficial.const import DOMAIN
+from custom_components.came_domotic_unofficial.models import CameDomoticServerData
+
+from .conftest import _mock_digital_input, _mock_server_info
+from .const import MOCK_CONFIG
+
+_API_CLIENT = (
+    "custom_components.came_domotic_unofficial.api.CameDomoticUnofficialApiClient"
+)
+
+_COORDINATOR = (
+    "custom_components.came_domotic_unofficial.coordinator"
+    ".CameDomoticUnofficialDataUpdateCoordinator"
+)
+
+
+async def _setup_entry(hass, mock_digital_inputs):
+    """Set up a config entry with the given mock digital inputs list."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(f"{_API_CLIENT}.async_get_thermo_zones", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_digital_inputs",
+            return_value=mock_digital_inputs,
+        ),
+        patch(f"{_API_CLIENT}.async_dispose"),
+        patch(f"{_COORDINATOR}.start_long_poll"),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    return config_entry
+
+
+# --- Entity creation ---
+
+
+async def test_binary_sensor_entities_created(hass, bypass_get_data):
+    """Test that one binary sensor entity is created per digital input."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entries = [
+        e
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id and e.domain == "binary_sensor"
+    ]
+    assert len(entries) == 2
+
+
+async def test_binary_sensor_unique_id(hass, bypass_get_data):
+    """Test binary sensor unique IDs follow the expected pattern."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    unique_ids = {
+        e.unique_id
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id and e.domain == "binary_sensor"
+    }
+    assert unique_ids == {
+        "test_digital_input_400",
+        "test_digital_input_401",
+    }
+
+
+async def test_binary_sensor_state(hass, bypass_get_data):
+    """Test binary sensor entities exist with expected entity IDs."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    front_door = hass.states.get("binary_sensor.front_door_sensor")
+    assert front_door is not None
+
+    window = hass.states.get("binary_sensor.window_contact")
+    assert window is not None
+
+
+async def test_no_digital_inputs(hass):
+    """Test no binary sensor entities created when there are no digital inputs."""
+    config_entry = await _setup_entry(hass, [])
+
+    registry = er.async_get(hass)
+    entries = [
+        e
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id and e.domain == "binary_sensor"
+    ]
+    assert len(entries) == 0
+
+
+# --- State properties ---
+
+
+async def test_binary_sensor_is_on_active(hass):
+    """Test is_on returns True when status is ACTIVE."""
+    digital_inputs = [
+        _mock_digital_input(400, "Front Door Sensor", status=DigitalInputStatus.ACTIVE),
+    ]
+    await _setup_entry(hass, digital_inputs)
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    assert state.state == "on"
+
+
+async def test_binary_sensor_is_on_idle(hass):
+    """Test is_on returns False when status is IDLE."""
+    digital_inputs = [
+        _mock_digital_input(400, "Front Door Sensor", status=DigitalInputStatus.IDLE),
+    ]
+    await _setup_entry(hass, digital_inputs)
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    assert state.state == "off"
+
+
+async def test_binary_sensor_is_on_unknown(hass):
+    """Test is_on returns None when status is UNKNOWN."""
+    digital_inputs = [
+        _mock_digital_input(
+            400, "Front Door Sensor", status=DigitalInputStatus.UNKNOWN
+        ),
+    ]
+    await _setup_entry(hass, digital_inputs)
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    assert state.state == "unknown"
+
+
+async def test_binary_sensor_is_on_not_found(hass):
+    """Test is_on returns None when digital input disappears from data."""
+    digital_inputs = [_mock_digital_input(400, "Front Door Sensor")]
+    config_entry = await _setup_entry(hass, digital_inputs)
+
+    coordinator = config_entry.runtime_data.coordinator
+    empty_data = CameDomoticServerData(
+        server_info=_mock_server_info(),
+    )
+    with patch.object(
+        coordinator,
+        "_async_update_data",
+        return_value=empty_data,
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    assert state.state == "unknown"
+
+
+# --- Extra attributes ---
+
+
+async def test_binary_sensor_extra_attributes(hass):
+    """Test binary sensor exposes extra digital input attributes."""
+    digital_inputs = [
+        _mock_digital_input(
+            400,
+            "Front Door Sensor",
+            status=DigitalInputStatus.ACTIVE,
+            utc_time=1700000000,
+        ),
+    ]
+    await _setup_entry(hass, digital_inputs)
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    assert state.attributes["addr"] == 0
+    assert state.attributes["input_type"] == "STATUS"
+    assert state.attributes["timestamp"] == "2023-11-14T14:13:20-08:00"
+
+
+async def test_binary_sensor_extra_attributes_not_found(hass):
+    """Test binary sensor returns no extra attributes when device disappears."""
+    digital_inputs = [_mock_digital_input(400, "Front Door Sensor")]
+    config_entry = await _setup_entry(hass, digital_inputs)
+
+    coordinator = config_entry.runtime_data.coordinator
+    empty_data = CameDomoticServerData(
+        server_info=_mock_server_info(),
+    )
+
+    with patch.object(
+        coordinator,
+        "_async_update_data",
+        return_value=empty_data,
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    state = hass.states.get("binary_sensor.front_door_sensor")
+    assert state is not None
+    # Extra attributes should not contain digital-input-specific keys
+    assert "input_type" not in state.attributes

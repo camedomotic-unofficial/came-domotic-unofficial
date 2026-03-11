@@ -6,7 +6,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
 
 from aiocamedomotic.auth import Auth
-from aiocamedomotic.models import Light, ThermoZone
+from aiocamedomotic.models import DigitalInput, Light, ThermoZone
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -111,6 +111,11 @@ async def test_coordinator_update_success(hass, bypass_get_data):
     assert 301 in lights
     assert 302 in lights
 
+    digital_inputs = coordinator.data.digital_inputs
+    assert len(digital_inputs) == 2
+    assert 400 in digital_inputs
+    assert 401 in digital_inputs
+
 
 async def test_coordinator_auth_error_raises_config_entry_auth_failed(
     hass, bypass_get_data
@@ -179,6 +184,7 @@ async def test_start_and_stop_long_poll(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -215,6 +221,7 @@ async def test_start_long_poll_already_running(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -271,6 +278,7 @@ async def test_long_poll_loop_incremental_update(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -590,6 +598,7 @@ async def test_stop_long_poll_cancels_running_task(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticUnofficialDataUpdateCoordinator,
@@ -632,6 +641,7 @@ async def test_merge_updates_known_zone(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -677,6 +687,7 @@ async def test_merge_updates_unknown_zone_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -717,6 +728,7 @@ async def test_merge_updates_preserves_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -772,6 +784,7 @@ async def test_merge_updates_known_scenario(hass):
         ),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -823,6 +836,7 @@ async def test_merge_updates_unknown_scenario_ignored(hass):
         ),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1161,6 +1175,7 @@ async def test_merge_updates_known_opening(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1203,6 +1218,7 @@ async def test_merge_updates_unknown_opening_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1240,6 +1256,7 @@ async def test_merge_updates_preserves_opening_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1318,6 +1335,7 @@ async def test_merge_updates_known_light(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1360,6 +1378,7 @@ async def test_merge_updates_unknown_light_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1397,6 +1416,7 @@ async def test_merge_updates_preserves_light_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1421,3 +1441,160 @@ async def test_merge_updates_preserves_light_fields_not_in_update(hass):
     assert light.perc == 75  # preserved
     assert light.name == "Living Room Dimmer"  # preserved
     assert light.floor_ind == 0  # preserved
+
+
+# --- _merge_updates: digital inputs ---
+
+
+def _real_digital_input(
+    act_id,
+    name,
+    status=1,
+    input_type=1,
+    addr=0,
+    utc_time=0,
+):
+    """Create a real DigitalInput with the given values (for merge tests)."""
+    return DigitalInput(
+        raw_data={
+            "act_id": act_id,
+            "name": name,
+            "status": status,
+            "type": input_type,
+            "addr": addr,
+            "utc_time": utc_time,
+        },
+        auth=_MOCK_AUTH,
+    )
+
+
+def _real_digital_inputs():
+    """Return a list of real digital inputs for merge tests."""
+    return [
+        _real_digital_input(400, "Front Door Sensor", status=1),
+        _real_digital_input(401, "Window Contact", status=0, utc_time=1700000000),
+    ]
+
+
+async def test_merge_updates_known_digital_input(hass):
+    """Test merging a digital input update for a known device."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    real_dis = _real_digital_inputs()
+
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(f"{_API_CLIENT}.async_get_thermo_zones", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(f"{_API_CLIENT}.async_dispose"),
+        patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    # Simulate status change from IDLE (1) to ACTIVE (0)
+    mock_update = MagicMock()
+    mock_update.act_id = 400
+    mock_update.name = "Front Door Sensor"
+    mock_update.raw_data = {"act_id": 400, "status": 0, "utc_time": 1700000001}
+
+    mock_update_list = MagicMock()
+    mock_update_list.get_typed_by_device_type.return_value = [mock_update]
+
+    coordinator._merge_updates(mock_update_list)
+    di = coordinator.data.digital_inputs[400]
+
+    assert di.status.value == 0  # ACTIVE
+    assert di.utc_time == 1700000001
+
+
+async def test_merge_updates_unknown_digital_input_ignored(hass):
+    """Test that updates for unknown digital inputs are silently ignored."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    real_dis = _real_digital_inputs()
+
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(f"{_API_CLIENT}.async_get_thermo_zones", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(f"{_API_CLIENT}.async_dispose"),
+        patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    mock_update = MagicMock()
+    mock_update.act_id = 999  # unknown digital input
+
+    mock_update_list = MagicMock()
+    mock_update_list.get_typed_by_device_type.return_value = [mock_update]
+
+    coordinator._merge_updates(mock_update_list)
+
+    # All original digital inputs should still be present
+    assert len(coordinator.data.digital_inputs) == 2
+
+
+async def test_merge_updates_preserves_digital_input_fields_not_in_update(hass):
+    """Test that partial updates only overwrite keys present in raw_data."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    real_dis = _real_digital_inputs()
+
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(f"{_API_CLIENT}.async_get_thermo_zones", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(f"{_API_CLIENT}.async_dispose"),
+        patch.object(CameDomoticUnofficialDataUpdateCoordinator, "start_long_poll"),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    # Update only contains status — everything else should be preserved
+    mock_update = MagicMock()
+    mock_update.act_id = 400
+    mock_update.name = "Front Door Sensor"
+    mock_update.raw_data = {"act_id": 400, "status": 0}
+
+    mock_update_list = MagicMock()
+    mock_update_list.get_typed_by_device_type.return_value = [mock_update]
+
+    coordinator._merge_updates(mock_update_list)
+    di = coordinator.data.digital_inputs[400]
+
+    assert di.status.value == 0  # ACTIVE (updated)
+    assert di.name == "Front Door Sensor"  # preserved
+    assert di.addr == 0  # preserved
+    assert di.utc_time == 0  # preserved (was 0 initially)

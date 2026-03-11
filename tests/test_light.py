@@ -43,6 +43,7 @@ async def _setup_entry(hass, mock_lights):
             f"{_API_CLIENT}.async_get_lights",
             return_value=mock_lights,
         ),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_COORDINATOR}.start_long_poll"),
     ):
