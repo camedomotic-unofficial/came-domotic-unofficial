@@ -201,6 +201,7 @@ class CameDomoticUnofficialDataUpdateCoordinator(
                     await asyncio.sleep(RECONNECT_DELAY)
                     continue
 
+            _LOGGER.debug("Long-poll iteration #%d", self._long_poll_count + 1)
             try:
                 update_list = await self.api.async_get_updates(
                     timeout=DEFAULT_LONG_POLL_TIMEOUT
@@ -264,10 +265,11 @@ class CameDomoticUnofficialDataUpdateCoordinator(
         """
         # Merge thermostat (thermo zone) updates
         thermo_updates = update_list.get_typed_by_device_type(DeviceType.THERMOSTAT)
-        _LOGGER.debug(
-            "Merging incremental updates: %d thermo zone update(s)",
-            len(thermo_updates) if thermo_updates else 0,
-        )
+        if thermo_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d thermo zone update(s)",
+                len(thermo_updates),
+            )
         for update in thermo_updates:
             zone = self.data.thermo_zones.get(update.act_id)
             if zone is not None:
@@ -285,10 +287,11 @@ class CameDomoticUnofficialDataUpdateCoordinator(
 
         # Merge scenario updates
         scenario_updates = update_list.get_typed_by_device_type(DeviceType.SCENARIO)
-        _LOGGER.debug(
-            "Merging incremental updates: %d scenario update(s)",
-            len(scenario_updates) if scenario_updates else 0,
-        )
+        if scenario_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d scenario update(s)",
+                len(scenario_updates),
+            )
         for update in scenario_updates:
             scenario = self.data.scenarios.get(update.id)
             if scenario is not None:
@@ -306,10 +309,11 @@ class CameDomoticUnofficialDataUpdateCoordinator(
 
         # Merge opening updates
         opening_updates = update_list.get_typed_by_device_type(DeviceType.OPENING)
-        _LOGGER.debug(
-            "Merging incremental updates: %d opening update(s)",
-            len(opening_updates) if opening_updates else 0,
-        )
+        if opening_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d opening update(s)",
+                len(opening_updates),
+            )
         for update in opening_updates:
             opening = self.data.openings.get(update.open_act_id)
             if opening is not None:
@@ -327,10 +331,11 @@ class CameDomoticUnofficialDataUpdateCoordinator(
 
         # Merge light updates
         light_updates = update_list.get_typed_by_device_type(DeviceType.LIGHT)
-        _LOGGER.debug(
-            "Merging incremental updates: %d light update(s)",
-            len(light_updates) if light_updates else 0,
-        )
+        if light_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d light update(s)",
+                len(light_updates),
+            )
         for update in light_updates:
             light = self.data.lights.get(update.act_id)
             if light is not None:
@@ -350,10 +355,11 @@ class CameDomoticUnofficialDataUpdateCoordinator(
         digital_input_updates = update_list.get_typed_by_device_type(
             DeviceType.DIGITAL_INPUT
         )
-        _LOGGER.debug(
-            "Merging incremental updates: %d digital input update(s)",
-            len(digital_input_updates) if digital_input_updates else 0,
-        )
+        if digital_input_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d digital input update(s)",
+                len(digital_input_updates),
+            )
         for update in digital_input_updates:
             digital_input = self.data.digital_inputs.get(update.act_id)
             if digital_input is not None:
