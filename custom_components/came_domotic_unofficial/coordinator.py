@@ -87,6 +87,7 @@ class CameDomoticUnofficialDataUpdateCoordinator(
             scenarios = await self.api.async_get_scenarios()
             openings = await self.api.async_get_openings()
             lights = await self.api.async_get_lights()
+            digital_inputs = await self.api.async_get_digital_inputs()
         except CameDomoticUnofficialApiClientAuthenticationError as exception:
             _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
@@ -96,11 +97,12 @@ class CameDomoticUnofficialDataUpdateCoordinator(
 
         _LOGGER.debug(
             "Full data fetch complete: %d thermo zone(s), %d scenario(s), "
-            "%d opening(s), %d light(s)",
+            "%d opening(s), %d light(s), %d digital input(s)",
             len(thermo_zones),
             len(scenarios),
             len(openings),
             len(lights),
+            len(digital_inputs),
         )
         return CameDomoticServerData(
             server_info=server_info,
@@ -108,6 +110,7 @@ class CameDomoticUnofficialDataUpdateCoordinator(
             scenarios={s.id: s for s in scenarios},
             openings={o.open_act_id: o for o in openings},
             lights={lt.act_id: lt for lt in lights},
+            digital_inputs={di.act_id: di for di in digital_inputs},
         )
 
     def start_long_poll(self) -> None:
@@ -340,5 +343,28 @@ class CameDomoticUnofficialDataUpdateCoordinator(
             else:
                 _LOGGER.debug(
                     "Received update for unknown light act_id=%d, ignoring",
+                    update.act_id,
+                )
+
+        # Merge digital input updates
+        digital_input_updates = update_list.get_typed_by_device_type(
+            DeviceType.DIGITAL_INPUT
+        )
+        _LOGGER.debug(
+            "Merging incremental updates: %d digital input update(s)",
+            len(digital_input_updates) if digital_input_updates else 0,
+        )
+        for update in digital_input_updates:
+            digital_input = self.data.digital_inputs.get(update.act_id)
+            if digital_input is not None:
+                digital_input.raw_data.update(update.raw_data)
+                _LOGGER.debug(
+                    "Applied update to digital input '%s' (act_id=%d)",
+                    update.name,
+                    update.act_id,
+                )
+            else:
+                _LOGGER.debug(
+                    "Received update for unknown digital input act_id=%d, ignoring",
                     update.act_id,
                 )

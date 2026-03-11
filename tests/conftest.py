@@ -2,7 +2,14 @@
 
 from unittest.mock import MagicMock, patch
 
-from aiocamedomotic.models import LightStatus, LightType, OpeningStatus, OpeningType
+from aiocamedomotic.models import (
+    DigitalInputStatus,
+    DigitalInputType,
+    LightStatus,
+    LightType,
+    OpeningStatus,
+    OpeningType,
+)
 import pytest
 
 from custom_components.came_domotic_unofficial.api import (
@@ -210,6 +217,45 @@ MOCK_LIGHTS = [
 ]
 
 
+def _mock_digital_input(
+    act_id,
+    name,
+    status=DigitalInputStatus.IDLE,
+    input_type=DigitalInputType.STATUS,
+    addr=0,
+    utc_time=0,
+):
+    """Create a mock DigitalInput object with all required attributes.
+
+    Includes a raw_data dict so that coordinator merge logic
+    (raw_data.update) works correctly in tests.
+    """
+    di = MagicMock()
+    di.act_id = act_id
+    di.name = name
+    di.status = status
+    di.type = input_type
+    di.addr = addr
+    di.utc_time = utc_time
+    di.raw_data = {
+        "act_id": act_id,
+        "name": name,
+        "status": status.value,
+        "type": input_type.value,
+        "addr": addr,
+        "utc_time": utc_time,
+    }
+    return di
+
+
+MOCK_DIGITAL_INPUTS = [
+    _mock_digital_input(400, "Front Door Sensor"),
+    _mock_digital_input(
+        401, "Window Contact", status=DigitalInputStatus.ACTIVE, utc_time=1700000000
+    ),
+]
+
+
 def _mock_server_info():
     """Create a mock ServerInfo object."""
     info = MagicMock()
@@ -229,6 +275,7 @@ MOCK_SERVER_DATA = CameDomoticServerData(
     scenarios={s.id: s for s in MOCK_SCENARIOS},
     openings={o.open_act_id: o for o in MOCK_OPENINGS},
     lights={lt.act_id: lt for lt in MOCK_LIGHTS},
+    digital_inputs={di.act_id: di for di in MOCK_DIGITAL_INPUTS},
 )
 
 
@@ -262,6 +309,10 @@ def bypass_get_data_fixture():
         patch(
             f"{_API_CLIENT}.async_get_lights",
             return_value=list(MOCK_LIGHTS),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_digital_inputs",
+            return_value=list(MOCK_DIGITAL_INPUTS),
         ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_COORDINATOR}.start_long_poll"),
