@@ -26,6 +26,7 @@ from custom_components.came_domotic.services import (
     SERVICE_CREATE_USER,
     SERVICE_DELETE_USER,
     SERVICE_GET_TERMINAL_GROUPS,
+    SERVICE_GET_USERS,
 )
 
 from .const import MOCK_CONFIG
@@ -835,6 +836,111 @@ async def test_get_terminal_groups_comm_error(hass, bypass_get_data):
         )
 
 
+# --- get_users ---
+
+
+async def test_get_users_success(hass, bypass_get_data):
+    """Test successful users retrieval."""
+    config_entry = await _setup_entry(hass)
+    mock_users = [_mock_user("admin"), _mock_user("guest")]
+
+    with patch.object(
+        config_entry.runtime_data.client,
+        "async_get_users",
+        return_value=mock_users,
+    ):
+        result = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_USERS,
+            {"config_entry_id": "test"},
+            blocking=True,
+            return_response=True,
+        )
+
+    assert result == {
+        "users": [
+            {"name": "admin"},
+            {"name": "guest"},
+        ]
+    }
+
+
+async def test_get_users_empty(hass, bypass_get_data):
+    """Test users retrieval returns empty list."""
+    config_entry = await _setup_entry(hass)
+
+    with patch.object(
+        config_entry.runtime_data.client,
+        "async_get_users",
+        return_value=[],
+    ):
+        result = await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_USERS,
+            {"config_entry_id": "test"},
+            blocking=True,
+            return_response=True,
+        )
+
+    assert result == {"users": []}
+
+
+async def test_get_users_entry_not_found(hass, bypass_get_data):
+    """Test get_users raises ServiceValidationError for unknown entry."""
+    await _setup_entry(hass)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_USERS,
+            {"config_entry_id": "nonexistent"},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_get_users_auth_error(hass, bypass_get_data):
+    """Test get_users raises HomeAssistantError on auth failure."""
+    config_entry = await _setup_entry(hass)
+
+    with (
+        patch.object(
+            config_entry.runtime_data.client,
+            "async_get_users",
+            side_effect=CameDomoticApiClientAuthenticationError("bad creds"),
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_USERS,
+            {"config_entry_id": "test"},
+            blocking=True,
+            return_response=True,
+        )
+
+
+async def test_get_users_comm_error(hass, bypass_get_data):
+    """Test get_users raises HomeAssistantError on communication failure."""
+    config_entry = await _setup_entry(hass)
+
+    with (
+        patch.object(
+            config_entry.runtime_data.client,
+            "async_get_users",
+            side_effect=CameDomoticApiClientCommunicationError("timeout"),
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_GET_USERS,
+            {"config_entry_id": "test"},
+            blocking=True,
+            return_response=True,
+        )
+
+
 # --- Service registration lifecycle ---
 
 
@@ -846,6 +952,7 @@ async def test_services_registered_after_setup(hass, bypass_get_data):
     assert hass.services.has_service(DOMAIN, SERVICE_DELETE_USER)
     assert hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
+    assert hass.services.has_service(DOMAIN, SERVICE_GET_USERS)
 
 
 async def test_services_removed_after_last_entry_unloaded(hass, bypass_get_data):
@@ -863,6 +970,7 @@ async def test_services_removed_after_last_entry_unloaded(hass, bypass_get_data)
     assert not hass.services.has_service(DOMAIN, SERVICE_DELETE_USER)
     assert not hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert not hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
+    assert not hass.services.has_service(DOMAIN, SERVICE_GET_USERS)
 
 
 async def test_services_kept_when_other_entries_loaded(hass, bypass_get_data):
@@ -891,3 +999,4 @@ async def test_services_kept_when_other_entries_loaded(hass, bypass_get_data):
     assert hass.services.has_service(DOMAIN, SERVICE_DELETE_USER)
     assert hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
+    assert hass.services.has_service(DOMAIN, SERVICE_GET_USERS)

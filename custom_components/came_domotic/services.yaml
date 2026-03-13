@@ -63,3 +63,11 @@ get_terminal_groups:
       selector:
         config_entry:
           integration: came_domotic
+
+get_users:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: came_domotic
