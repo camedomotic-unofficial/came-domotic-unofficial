@@ -80,3 +80,4 @@ class CameDomoticThermoSeasonSelect(CameDomoticEntity, SelectEntity):
             _LOGGER.warning("Unknown thermo season option: %s", option)
             return
         await self.coordinator.api.async_set_thermo_season(season)
+        await self.coordinator.async_request_refresh()

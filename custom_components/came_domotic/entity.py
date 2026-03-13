@@ -85,7 +85,8 @@ class CameDomoticDeviceEntity(CoordinatorEntity[CameDomoticDataUpdateCoordinator
             entity_key: Unique key for this entity within the config entry.
             device_name: Display name for the HA device.
             device_id: Unique device identifier (e.g. "light_300").
-            floor_ind: Floor index for suggested area lookup.
+            floor_ind: Floor index (reserved for future hierarchical area
+                resolution; currently not used in suggested_area lookup).
             room_ind: Room index for suggested area lookup.
         """
         super().__init__(coordinator)

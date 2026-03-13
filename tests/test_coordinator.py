@@ -163,6 +163,54 @@ async def test_coordinator_communication_error_raises_update_failed(
         await coordinator._async_update_data()
 
 
+async def test_floors_rooms_comm_error_continues_without_area_data(
+    hass, bypass_get_data
+):
+    """Test that a comm error fetching floors/rooms does not abort the update."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    with patch.object(
+        coordinator.api,
+        "async_get_floors",
+        side_effect=CameDomoticApiClientCommunicationError("Timeout"),
+    ):
+        data = await coordinator._async_update_data()
+
+    # Update succeeds, but floors and rooms are empty
+    assert data.floors == {}
+    assert data.rooms == {}
+    assert len(data.thermo_zones) > 0
+
+
+async def test_floors_rooms_auth_error_raises_config_entry_auth_failed(
+    hass, bypass_get_data
+):
+    """Test that an auth error fetching floors/rooms still triggers reauth."""
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    with (
+        patch.object(
+            coordinator.api,
+            "async_get_floors",
+            side_effect=CameDomoticApiClientAuthenticationError("Bad auth"),
+        ),
+        pytest.raises(ConfigEntryAuthFailed),
+    ):
+        await coordinator._async_update_data()
+
+
 # --- start_long_poll / stop_long_poll ---
 
 

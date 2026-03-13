@@ -1,5 +1,7 @@
 """Global fixtures for CAME Domotic integration."""
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 from aiocamedomotic.models import (

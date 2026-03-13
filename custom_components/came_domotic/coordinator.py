@@ -176,14 +176,28 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             openings = await self.api.async_get_openings()
             lights = await self.api.async_get_lights()
             digital_inputs = await self.api.async_get_digital_inputs()
-            floors = await self.api.async_get_floors()
-            rooms = await self.api.async_get_rooms()
         except CameDomoticApiClientAuthenticationError as exception:
             _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
         except CameDomoticApiClientError as exception:
             _LOGGER.warning("Error updating data: %s", exception)
             raise UpdateFailed(exception) from exception
+
+        # Floors and rooms are structural metadata — fetch best-effort so
+        # failures here don't abort the entire data update.
+        floors: list = []
+        rooms: list = []
+        try:
+            floors = await self.api.async_get_floors()
+            rooms = await self.api.async_get_rooms()
+        except CameDomoticApiClientAuthenticationError as exception:
+            _LOGGER.warning("Authentication failed fetching floors/rooms")
+            raise ConfigEntryAuthFailed(exception) from exception
+        except CameDomoticApiClientError as err:
+            _LOGGER.warning(
+                "Failed to fetch floors/rooms, continuing without area data: %s",
+                err,
+            )
 
         _LOGGER.debug(
             "Full data fetch complete: %d thermo zone(s), %d scenario(s), "
