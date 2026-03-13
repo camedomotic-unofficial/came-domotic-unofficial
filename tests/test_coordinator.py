@@ -185,6 +185,14 @@ async def test_start_and_stop_long_poll(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticDataUpdateCoordinator,
@@ -222,6 +230,14 @@ async def test_start_long_poll_already_running(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticDataUpdateCoordinator,
@@ -279,6 +295,14 @@ async def test_long_poll_loop_incremental_update(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -593,6 +617,14 @@ async def test_stop_long_poll_cancels_running_task(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(
             CameDomoticDataUpdateCoordinator,
@@ -636,6 +668,14 @@ async def test_merge_updates_known_zone(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -682,6 +722,14 @@ async def test_merge_updates_unknown_zone_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -723,6 +771,14 @@ async def test_merge_updates_preserves_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -779,6 +835,14 @@ async def test_merge_updates_known_scenario(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -831,6 +895,14 @@ async def test_merge_updates_unknown_scenario_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1168,6 +1240,14 @@ async def test_merge_updates_known_opening(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1211,6 +1291,14 @@ async def test_merge_updates_unknown_opening_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1249,6 +1337,14 @@ async def test_merge_updates_preserves_opening_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=real_opens),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1328,6 +1424,14 @@ async def test_merge_updates_known_light(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1371,6 +1475,14 @@ async def test_merge_updates_unknown_light_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1409,6 +1521,14 @@ async def test_merge_updates_preserves_light_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=real_lts),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1486,6 +1606,14 @@ async def test_merge_updates_known_digital_input(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1528,6 +1656,14 @@ async def test_merge_updates_unknown_digital_input_ignored(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1566,6 +1702,14 @@ async def test_merge_updates_preserves_digital_input_fields_not_in_update(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=real_dis),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch.object(CameDomoticDataUpdateCoordinator, "start_long_poll"),
     ):
@@ -1670,6 +1814,14 @@ async def test_attach_ping_coordinator_disconnect_stops_long_poll(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_API_CLIENT}.async_ping", return_value=5.0),
         patch.object(
@@ -1713,6 +1865,14 @@ async def test_attach_ping_coordinator_reconnect_resumes_long_poll(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_API_CLIENT}.async_ping", return_value=5.0),
         patch.object(
@@ -1763,6 +1923,14 @@ async def test_reconnect_refresh_auth_error_triggers_reauth(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_API_CLIENT}.async_ping", return_value=5.0),
         patch.object(
@@ -1815,6 +1983,14 @@ async def test_reconnect_refresh_comm_error_resumes_long_poll(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_API_CLIENT}.async_ping", return_value=5.0),
         patch.object(
@@ -1869,6 +2045,14 @@ async def test_reconnect_skips_long_poll_if_server_went_unavailable(hass):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_floors",
+            return_value=[],
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_rooms",
+            return_value=[],
+        ),
         patch(f"{_API_CLIENT}.async_dispose"),
         patch(f"{_API_CLIENT}.async_ping", return_value=5.0),
         patch.object(
