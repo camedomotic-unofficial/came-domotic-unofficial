@@ -34,6 +34,7 @@ SERVICE_CREATE_USER = "create_user"
 SERVICE_DELETE_USER = "delete_user"
 SERVICE_CHANGE_PASSWORD = "change_password"  # noqa: S105  # nosec B105
 SERVICE_GET_TERMINAL_GROUPS = "get_terminal_groups"
+SERVICE_GET_USERS = "get_users"
 
 # Field attribute names
 ATTR_USERNAME = "username"
@@ -69,6 +70,12 @@ SERVICE_CHANGE_PASSWORD_SCHEMA = vol.Schema(
 )
 
 SERVICE_GET_TERMINAL_GROUPS_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+    }
+)
+
+SERVICE_GET_USERS_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
     }
@@ -303,6 +310,33 @@ async def async_handle_get_terminal_groups(call: ServiceCall) -> ServiceResponse
     }
 
 
+async def async_handle_get_users(call: ServiceCall) -> ServiceResponse:
+    """Handle the get_users service call."""
+    hass = call.hass
+    _, client = _get_entry_and_client(hass, call)
+
+    _LOGGER.debug("Service call: fetching users")
+
+    try:
+        users = await client.async_get_users()
+    except CameDomoticApiClientAuthenticationError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="service_auth_error",
+            translation_placeholders={"error": str(err)},
+        ) from err
+    except CameDomoticApiClientCommunicationError as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="service_comm_error",
+            translation_placeholders={"error": str(err)},
+        ) from err
+
+    _LOGGER.debug("Fetched %d user(s)", len(users))
+
+    return {"users": [{"name": user.name} for user in users]}
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration services."""
     hass.services.async_register(
@@ -330,6 +364,13 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=SERVICE_GET_TERMINAL_GROUPS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_USERS,
+        async_handle_get_users,
+        schema=SERVICE_GET_USERS_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
 
     _LOGGER.debug("Registered %s services", DOMAIN)
 
@@ -349,5 +390,6 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, SERVICE_DELETE_USER)
     hass.services.async_remove(DOMAIN, SERVICE_CHANGE_PASSWORD)
     hass.services.async_remove(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
+    hass.services.async_remove(DOMAIN, SERVICE_GET_USERS)
 
     _LOGGER.debug("Removed %s services", DOMAIN)

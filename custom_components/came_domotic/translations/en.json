@@ -116,6 +116,16 @@
           "description": "The CAME Domotic server to query."
         }
       }
+    },
+    "get_users": {
+      "name": "Get users",
+      "description": "List users configured on the CAME Domotic server.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config entry",
+          "description": "The CAME Domotic server to query."
+        }
+      }
     }
   },
   "exceptions": {
