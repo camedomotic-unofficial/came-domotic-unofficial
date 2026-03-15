@@ -172,6 +172,7 @@ async def test_topology_comm_error_continues_without_area_data(hass, bypass_get_
     await hass.async_block_till_done()
 
     coordinator = config_entry.runtime_data.coordinator
+    previous_topology = coordinator.data.topology
 
     with patch.object(
         coordinator.api,
@@ -180,8 +181,8 @@ async def test_topology_comm_error_continues_without_area_data(hass, bypass_get_
     ):
         data = await coordinator._async_update_data()
 
-    # Update succeeds, but topology is None
-    assert data.topology is None
+    # Update succeeds, previous topology is preserved as fallback
+    assert data.topology is previous_topology
     assert len(data.thermo_zones) > 0
 
 

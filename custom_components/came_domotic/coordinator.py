@@ -185,7 +185,8 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
 
         # Topology (floors/rooms) is structural metadata — fetch best-effort
         # so failures here don't abort the entire data update.
-        topology = None
+        # Preserve previous topology as fallback for transient failures.
+        topology = getattr(self, "data", None) and self.data.topology
         try:
             topology = await self.api.async_get_topology()
         except CameDomoticApiClientAuthenticationError as exception:
@@ -193,7 +194,10 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             raise ConfigEntryAuthFailed(exception) from exception
         except CameDomoticApiClientError as err:
             _LOGGER.warning(
-                "Failed to fetch topology, continuing without area data: %s",
+                "Failed to fetch topology, %s: %s",
+                "keeping previous area data"
+                if topology
+                else "continuing without area data",
                 err,
             )
 

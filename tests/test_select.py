@@ -147,6 +147,7 @@ async def test_thermo_season_select_option_winter(hass):
 
     coordinator = config_entry.runtime_data.coordinator
     coordinator.api.async_set_thermo_season = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
 
     await hass.services.async_call(
         "select",
@@ -169,6 +170,7 @@ async def test_thermo_season_select_option_summer(hass):
 
     coordinator = config_entry.runtime_data.coordinator
     coordinator.api.async_set_thermo_season = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
 
     await hass.services.async_call(
         "select",
@@ -191,6 +193,7 @@ async def test_thermo_season_select_option_plant_off(hass):
 
     coordinator = config_entry.runtime_data.coordinator
     coordinator.api.async_set_thermo_season = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
 
     await hass.services.async_call(
         "select",
@@ -216,7 +219,7 @@ async def test_thermo_season_select_options_list(hass):
     assert state.attributes["options"] == ["winter", "summer", "plant_off"]
 
 
-async def test_thermo_season_select_unknown_option(hass):
+async def test_thermo_season_select_unknown_option(hass, caplog):
     """Test selecting an unknown option logs warning and does not call API."""
     config_entry = await _setup_entry(hass)
 
@@ -237,6 +240,7 @@ async def test_thermo_season_select_unknown_option(hass):
 
     await entity.async_select_option("invalid_season")
     coordinator.api.async_set_thermo_season.assert_not_awaited()
+    assert "Unknown thermo season option: invalid_season" in caplog.text
 
 
 async def test_thermo_season_select_unavailable_when_disconnected(hass):
