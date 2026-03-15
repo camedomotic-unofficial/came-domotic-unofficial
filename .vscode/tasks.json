@@ -8,6 +8,12 @@
       "problemMatcher": []
     },
     {
+      "label": "Run Home Assistant on port 9123 and log to file",
+      "type": "shell",
+      "command": "mkdir -p /workspaces/came_domotic/tmp && hass --config /workspaces/came_domotic/config -v 2>&1 | tee -a /workspaces/came_domotic/tmp/ha.log",
+      "problemMatcher": []
+    },
+    {
       "label": "Run Home Assistant configuration against /config",
       "type": "shell",
       "command": "hass --config /workspaces/came_domotic/config --script check_config",

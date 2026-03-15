@@ -10,6 +10,7 @@ Supports three light types via the aiocamedomotic library:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from aiocamedomotic.models import LightStatus, LightType
@@ -19,7 +20,7 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import CameDomoticConfigEntry
@@ -27,6 +28,8 @@ from .coordinator import CameDomoticDataUpdateCoordinator
 from .entity import CameDomoticDeviceEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+_OPTIMISTIC_TIMEOUT = 10.0  # seconds before optimistic state is force-cleared
 
 # Map aiocamedomotic LightType to Home Assistant ColorMode.
 _COLOR_MODE_MAP: dict[LightType, ColorMode] = {
@@ -98,10 +101,46 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         color_mode = _COLOR_MODE_MAP.get(light_type, ColorMode.ONOFF)
         self._attr_color_mode = color_mode
         self._attr_supported_color_modes = {color_mode}
+        self._optimistic_is_on: bool | None = None
+        self._optimistic_brightness: int | None = None
+        self._optimistic_rgb: tuple[int, int, int] | None = None
+        self._optimistic_snapshot_status: LightStatus | None = None
+        self._optimistic_set_at: float | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Clear optimistic state when coordinator data catches up or times out."""
+        if self._optimistic_is_on is not None:
+            light = self.coordinator.data.lights.get(self._act_id)
+            timed_out = (
+                self._optimistic_set_at is not None
+                and time.monotonic() - self._optimistic_set_at > _OPTIMISTIC_TIMEOUT
+            )
+            data_changed = (
+                light is not None
+                and self._optimistic_snapshot_status is not None
+                and light.status != self._optimistic_snapshot_status
+            )
+            if timed_out or data_changed or light is None:
+                _LOGGER.debug(
+                    "Clearing optimistic state for light act_id=%d"
+                    " (timed_out=%s, data_changed=%s)",
+                    self._act_id,
+                    timed_out,
+                    data_changed,
+                )
+                self._optimistic_is_on = None
+                self._optimistic_brightness = None
+                self._optimistic_rgb = None
+                self._optimistic_snapshot_status = None
+                self._optimistic_set_at = None
+        super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool | None:
         """Return True if the light is on."""
+        if self._optimistic_is_on is not None:
+            return self._optimistic_is_on
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None:
             return None
@@ -115,6 +154,8 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         Returns None for ONOFF lights or when light data is unavailable.
         HA only calls this property for modes that support brightness.
         """
+        if self._optimistic_brightness is not None:
+            return self._optimistic_brightness
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None or light.perc is None:
             return None
@@ -127,6 +168,8 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         Returns None when light data is unavailable or has no color.
         HA only calls this property for modes that support RGB.
         """
+        if self._optimistic_rgb is not None:
+            return self._optimistic_rgb
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None or light.rgb is None:
             return None
@@ -152,9 +195,30 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         if ATTR_RGB_COLOR in kwargs:
             rgb = list(kwargs[ATTR_RGB_COLOR])
 
+        # Capture pre-call state so _handle_coordinator_update can detect changes
+        pre_call_status = light.status
+        pre_call_time = time.monotonic()
+
         await self.coordinator.api.async_set_light_status(
             light, LightStatus.ON, brightness=brightness, rgb=rgb
         )
+
+        # Optimistic update after successful API call
+        self._optimistic_snapshot_status = pre_call_status
+        self._optimistic_set_at = pre_call_time
+        self._optimistic_is_on = True
+        if brightness is not None:
+            self._optimistic_brightness = round(brightness * 255 / 100)
+        if ATTR_RGB_COLOR in kwargs:
+            self._optimistic_rgb = tuple(kwargs[ATTR_RGB_COLOR])
+        _LOGGER.debug(
+            "Optimistic update for light act_id=%d: is_on=%s, brightness=%s, rgb=%s",
+            self._act_id,
+            self._optimistic_is_on,
+            self._optimistic_brightness,
+            self._optimistic_rgb,
+        )
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
@@ -165,7 +229,20 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
                 self._act_id,
             )
             return
+        # Capture pre-call state so _handle_coordinator_update can detect changes
+        pre_call_status = light.status
+        pre_call_time = time.monotonic()
+
         await self.coordinator.api.async_set_light_status(light, LightStatus.OFF)
+
+        self._optimistic_snapshot_status = pre_call_status
+        self._optimistic_set_at = pre_call_time
+        self._optimistic_is_on = False
+        _LOGGER.debug(
+            "Optimistic update for light act_id=%d: is_on=False",
+            self._act_id,
+        )
+        self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

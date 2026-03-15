@@ -15,6 +15,7 @@ node_modules/
 
 # Other integrations examples
 examples/
+tmp/
 
 # Claude code custom settings
 .claude/

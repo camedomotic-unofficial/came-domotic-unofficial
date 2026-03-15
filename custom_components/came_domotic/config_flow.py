@@ -113,7 +113,7 @@ class CameDomoticFlowHandler(ConfigFlow, domain=DOMAIN):
                     "Configuration entry created for %s", user_input[CONF_HOST]
                 )
                 return self.async_create_entry(
-                    title=f"CAME Domotic ({user_input[CONF_HOST]})",
+                    title=f"CAME ETI/Domo server ({user_input[CONF_HOST]})",
                     data={**user_input, CONF_SERVER_INFO: server_info_dict},
                 )
 
@@ -184,7 +184,7 @@ class CameDomoticFlowHandler(ConfigFlow, domain=DOMAIN):
                     "DHCP: configuration entry created for %s", self._discovered_host
                 )
                 return self.async_create_entry(
-                    title=f"CAME Domotic ({self._discovered_host})",
+                    title=f"CAME ETI/Domo server ({self._discovered_host})",
                     data={
                         CONF_HOST: self._discovered_host,
                         CONF_USERNAME: user_input[CONF_USERNAME],

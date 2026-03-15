@@ -16,7 +16,7 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import CameDomoticConfigEntry
@@ -101,6 +101,26 @@ class CameDomoticCover(CameDomoticDeviceEntity, CoverEntity):
         self._attr_has_entity_name = False
         self._attr_name = opening_name
         self._attr_device_class = _DEVICE_CLASS_MAP.get(opening_type)
+        self._optimistic_is_opening: bool | None = None
+        self._optimistic_is_closing: bool | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Clear optimistic state when coordinator pushes real data."""
+        if (
+            self._optimistic_is_opening is not None
+            or self._optimistic_is_closing is not None
+        ):
+            _LOGGER.debug(
+                "Coordinator update clearing optimistic state for cover open_act_id=%d"
+                " (is_opening=%s, is_closing=%s)",
+                self._open_act_id,
+                self._optimistic_is_opening,
+                self._optimistic_is_closing,
+            )
+        self._optimistic_is_opening = None
+        self._optimistic_is_closing = None
+        super()._handle_coordinator_update()
 
     @property
     def is_closed(self) -> bool | None:
@@ -110,6 +130,8 @@ class CameDomoticCover(CameDomoticDeviceEntity, CoverEntity):
     @property
     def is_opening(self) -> bool:
         """Return True if the cover motor is currently opening."""
+        if self._optimistic_is_opening is not None:
+            return self._optimistic_is_opening
         opening = self.coordinator.data.openings.get(self._open_act_id)
         if opening is None:
             return False
@@ -118,87 +140,81 @@ class CameDomoticCover(CameDomoticDeviceEntity, CoverEntity):
     @property
     def is_closing(self) -> bool:
         """Return True if the cover motor is currently closing."""
+        if self._optimistic_is_closing is not None:
+            return self._optimistic_is_closing
         opening = self.coordinator.data.openings.get(self._open_act_id)
         if opening is None:
             return False
         return opening.status == OpeningStatus.CLOSING
 
-    async def async_open_cover(self, **kwargs: Any) -> None:
-        """Open the cover."""
+    async def _async_set_status(
+        self,
+        target_status: OpeningStatus,
+        action: str,
+        is_opening: bool,
+        is_closing: bool,
+    ) -> None:
+        """Send a status command and optimistically update state."""
         opening = self.coordinator.data.openings.get(self._open_act_id)
         if opening is None:
             _LOGGER.warning(
-                "Cannot open cover open_act_id=%d: not found in coordinator data",
+                "Cannot %s cover open_act_id=%d: not found in coordinator data",
+                action,
                 self._open_act_id,
             )
             return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.OPENING
+        await self.coordinator.api.async_set_opening_status(opening, target_status)
+
+        self._optimistic_is_opening = is_opening
+        self._optimistic_is_closing = is_closing
+        _LOGGER.debug(
+            "Optimistic update for cover open_act_id=%d: is_opening=%s, is_closing=%s",
+            self._open_act_id,
+            is_opening,
+            is_closing,
+        )
+        self.async_write_ha_state()
+
+    async def async_open_cover(self, **kwargs: Any) -> None:
+        """Open the cover."""
+        await self._async_set_status(
+            OpeningStatus.OPENING, "open", is_opening=True, is_closing=False
         )
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
-        opening = self.coordinator.data.openings.get(self._open_act_id)
-        if opening is None:
-            _LOGGER.warning(
-                "Cannot close cover open_act_id=%d: not found in coordinator data",
-                self._open_act_id,
-            )
-            return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.CLOSING
+        await self._async_set_status(
+            OpeningStatus.CLOSING, "close", is_opening=False, is_closing=True
         )
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover motor."""
-        opening = self.coordinator.data.openings.get(self._open_act_id)
-        if opening is None:
-            _LOGGER.warning(
-                "Cannot stop cover open_act_id=%d: not found in coordinator data",
-                self._open_act_id,
-            )
-            return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.STOPPED
+        await self._async_set_status(
+            OpeningStatus.STOPPED, "stop", is_opening=False, is_closing=False
         )
 
     async def async_open_cover_tilt(self, **kwargs: Any) -> None:
         """Open the cover tilt (slat open)."""
-        opening = self.coordinator.data.openings.get(self._open_act_id)
-        if opening is None:
-            _LOGGER.warning(
-                "Cannot open tilt for cover open_act_id=%d: not found",
-                self._open_act_id,
-            )
-            return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.SLAT_OPEN
+        await self._async_set_status(
+            OpeningStatus.SLAT_OPEN, "open tilt", is_opening=False, is_closing=False
         )
 
     async def async_close_cover_tilt(self, **kwargs: Any) -> None:
         """Close the cover tilt (slat close)."""
-        opening = self.coordinator.data.openings.get(self._open_act_id)
-        if opening is None:
-            _LOGGER.warning(
-                "Cannot close tilt for cover open_act_id=%d: not found",
-                self._open_act_id,
-            )
-            return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.SLAT_CLOSE
+        await self._async_set_status(
+            OpeningStatus.SLAT_CLOSE,
+            "close tilt",
+            is_opening=False,
+            is_closing=False,
         )
 
     async def async_stop_cover_tilt(self, **kwargs: Any) -> None:
         """Stop the cover tilt."""
-        opening = self.coordinator.data.openings.get(self._open_act_id)
-        if opening is None:
-            _LOGGER.warning(
-                "Cannot stop tilt for cover open_act_id=%d: not found",
-                self._open_act_id,
-            )
-            return
-        await self.coordinator.api.async_set_opening_status(
-            opening, OpeningStatus.STOPPED
+        await self._async_set_status(
+            OpeningStatus.STOPPED,
+            "stop tilt",
+            is_opening=False,
+            is_closing=False,
         )
 
     @property
