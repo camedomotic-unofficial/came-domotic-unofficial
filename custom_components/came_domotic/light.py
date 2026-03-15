@@ -19,7 +19,7 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import CameDomoticConfigEntry
@@ -98,10 +98,28 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         color_mode = _COLOR_MODE_MAP.get(light_type, ColorMode.ONOFF)
         self._attr_color_mode = color_mode
         self._attr_supported_color_modes = {color_mode}
+        self._optimistic_is_on: bool | None = None
+        self._optimistic_brightness: int | None = None
+        self._optimistic_rgb: tuple[int, int, int] | None = None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Clear optimistic state when coordinator pushes real data."""
+        if self._optimistic_is_on is not None:
+            _LOGGER.debug(
+                "Coordinator update clearing optimistic state for light act_id=%d",
+                self._act_id,
+            )
+        self._optimistic_is_on = None
+        self._optimistic_brightness = None
+        self._optimistic_rgb = None
+        super()._handle_coordinator_update()
 
     @property
     def is_on(self) -> bool | None:
         """Return True if the light is on."""
+        if self._optimistic_is_on is not None:
+            return self._optimistic_is_on
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None:
             return None
@@ -115,6 +133,8 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         Returns None for ONOFF lights or when light data is unavailable.
         HA only calls this property for modes that support brightness.
         """
+        if self._optimistic_brightness is not None:
+            return self._optimistic_brightness
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None or light.perc is None:
             return None
@@ -127,6 +147,8 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         Returns None when light data is unavailable or has no color.
         HA only calls this property for modes that support RGB.
         """
+        if self._optimistic_rgb is not None:
+            return self._optimistic_rgb
         light = self.coordinator.data.lights.get(self._act_id)
         if light is None or light.rgb is None:
             return None
@@ -156,6 +178,21 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
             light, LightStatus.ON, brightness=brightness, rgb=rgb
         )
 
+        # Optimistic update after successful API call
+        self._optimistic_is_on = True
+        if ATTR_BRIGHTNESS in kwargs:
+            self._optimistic_brightness = round(kwargs[ATTR_BRIGHTNESS])
+        if ATTR_RGB_COLOR in kwargs:
+            self._optimistic_rgb = tuple(kwargs[ATTR_RGB_COLOR])
+        _LOGGER.debug(
+            "Optimistic update for light act_id=%d: is_on=%s, brightness=%s, rgb=%s",
+            self._act_id,
+            self._optimistic_is_on,
+            self._optimistic_brightness,
+            self._optimistic_rgb,
+        )
+        self.async_write_ha_state()
+
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
         light = self.coordinator.data.lights.get(self._act_id)
@@ -166,6 +203,13 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
             )
             return
         await self.coordinator.api.async_set_light_status(light, LightStatus.OFF)
+
+        self._optimistic_is_on = False
+        _LOGGER.debug(
+            "Optimistic update for light act_id=%d: is_on=False",
+            self._act_id,
+        )
+        self.async_write_ha_state()
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:

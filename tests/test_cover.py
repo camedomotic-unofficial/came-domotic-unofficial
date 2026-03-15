@@ -7,8 +7,12 @@ from unittest.mock import AsyncMock, patch
 from aiocamedomotic.models import OpeningStatus, OpeningType
 from homeassistant.components.cover import CoverDeviceClass
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.came_domotic.api import (
+    CameDomoticApiClientCommunicationError,
+)
 from custom_components.came_domotic.const import DOMAIN
 from custom_components.came_domotic.models import CameDomoticServerData
 
@@ -513,3 +517,130 @@ async def test_cover_device_class_unknown_type(hass):
     state = hass.states.get("cover.mystery_opening")
     assert state is not None
     assert "device_class" not in state.attributes
+
+
+# --- Optimistic state updates ---
+
+
+async def test_cover_open_optimistic_state(hass):
+    """Test state shows 'opening' immediately after successful open_cover."""
+    openings = [
+        _mock_opening(100, 101, "Living Room Shutter", status=OpeningStatus.STOPPED)
+    ]
+    config_entry = await _setup_entry(hass, openings)
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    with patch.object(coordinator.api, "async_set_opening_status", AsyncMock()):
+        await hass.services.async_call(
+            "cover",
+            "open_cover",
+            {"entity_id": "cover.living_room_shutter"},
+            blocking=True,
+        )
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state is not None
+    assert state.state == "opening"
+
+
+async def test_cover_close_optimistic_state(hass):
+    """Test state shows 'closing' immediately after successful close_cover."""
+    openings = [
+        _mock_opening(100, 101, "Living Room Shutter", status=OpeningStatus.STOPPED)
+    ]
+    config_entry = await _setup_entry(hass, openings)
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    with patch.object(coordinator.api, "async_set_opening_status", AsyncMock()):
+        await hass.services.async_call(
+            "cover",
+            "close_cover",
+            {"entity_id": "cover.living_room_shutter"},
+            blocking=True,
+        )
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state is not None
+    assert state.state == "closing"
+
+
+async def test_cover_stop_optimistic_state(hass):
+    """Test state no longer shows opening/closing after successful stop_cover."""
+    openings = [
+        _mock_opening(100, 101, "Living Room Shutter", status=OpeningStatus.OPENING)
+    ]
+    config_entry = await _setup_entry(hass, openings)
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    with patch.object(coordinator.api, "async_set_opening_status", AsyncMock()):
+        await hass.services.async_call(
+            "cover",
+            "stop_cover",
+            {"entity_id": "cover.living_room_shutter"},
+            blocking=True,
+        )
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state is not None
+    assert state.state != "opening"
+    assert state.state != "closing"
+
+
+async def test_cover_optimistic_cleared_on_coordinator_update(hass):
+    """Test optimistic state is cleared when coordinator pushes real data."""
+    openings = [
+        _mock_opening(100, 101, "Living Room Shutter", status=OpeningStatus.STOPPED)
+    ]
+    config_entry = await _setup_entry(hass, openings)
+
+    coordinator = config_entry.runtime_data.coordinator
+
+    # Set optimistic state
+    with patch.object(coordinator.api, "async_set_opening_status", AsyncMock()):
+        await hass.services.async_call(
+            "cover",
+            "open_cover",
+            {"entity_id": "cover.living_room_shutter"},
+            blocking=True,
+        )
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state.state == "opening"
+
+    # Coordinator update should clear optimistic state, reverting to STOPPED
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state.state != "opening"
+
+
+async def test_cover_open_api_error_no_optimistic(hass):
+    """Test no optimistic update when API call fails."""
+    openings = [
+        _mock_opening(100, 101, "Living Room Shutter", status=OpeningStatus.STOPPED)
+    ]
+    config_entry = await _setup_entry(hass, openings)
+
+    coordinator = config_entry.runtime_data.coordinator
+    mock_set_status = AsyncMock(
+        side_effect=CameDomoticApiClientCommunicationError("fail"),
+    )
+
+    with (
+        patch.object(coordinator.api, "async_set_opening_status", mock_set_status),
+        pytest.raises(CameDomoticApiClientCommunicationError),
+    ):
+        await hass.services.async_call(
+            "cover",
+            "open_cover",
+            {"entity_id": "cover.living_room_shutter"},
+            blocking=True,
+        )
+
+    state = hass.states.get("cover.living_room_shutter")
+    assert state is not None
+    assert state.state != "opening"
