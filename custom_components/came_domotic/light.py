@@ -10,7 +10,6 @@ Supports three light types via the aiocamedomotic library:
 from __future__ import annotations
 
 import logging
-import time
 from typing import Any
 
 from aiocamedomotic.models import LightStatus, LightType
@@ -20,8 +19,9 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 
 from . import CameDomoticConfigEntry
 from .coordinator import CameDomoticDataUpdateCoordinator
@@ -29,7 +29,7 @@ from .entity import CameDomoticDeviceEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-_OPTIMISTIC_TIMEOUT = 10.0  # seconds before optimistic state is force-cleared
+_OPTIMISTIC_TIMEOUT = 5.0  # seconds before optimistic state is force-cleared
 
 # Map aiocamedomotic LightType to Home Assistant ColorMode.
 _COLOR_MODE_MAP: dict[LightType, ColorMode] = {
@@ -105,35 +105,38 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
         self._optimistic_brightness: int | None = None
         self._optimistic_rgb: tuple[int, int, int] | None = None
         self._optimistic_snapshot_status: LightStatus | None = None
-        self._optimistic_set_at: float | None = None
+        self._optimistic_timeout_cancel: CALLBACK_TYPE | None = None
+
+    @callback
+    def _clear_optimistic_state(self, reason: str) -> None:
+        """Clear optimistic state and cancel any pending timeout."""
+        _LOGGER.debug(
+            "Clearing optimistic state for light act_id=%d (%s)",
+            self._act_id,
+            reason,
+        )
+        self._optimistic_is_on = None
+        self._optimistic_brightness = None
+        self._optimistic_rgb = None
+        self._optimistic_snapshot_status = None
+        if self._optimistic_timeout_cancel is not None:
+            self._optimistic_timeout_cancel()
+            self._optimistic_timeout_cancel = None
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Clear optimistic state when coordinator data catches up or times out."""
+        """Clear optimistic state when coordinator data catches up."""
         if self._optimistic_is_on is not None:
             light = self.coordinator.data.lights.get(self._act_id)
-            timed_out = (
-                self._optimistic_set_at is not None
-                and time.monotonic() - self._optimistic_set_at > _OPTIMISTIC_TIMEOUT
-            )
             data_changed = (
                 light is not None
                 and self._optimistic_snapshot_status is not None
                 and light.status != self._optimistic_snapshot_status
             )
-            if timed_out or data_changed or light is None:
-                _LOGGER.debug(
-                    "Clearing optimistic state for light act_id=%d"
-                    " (timed_out=%s, data_changed=%s)",
-                    self._act_id,
-                    timed_out,
-                    data_changed,
+            if data_changed or light is None:
+                self._clear_optimistic_state(
+                    f"data_changed={data_changed}, light_missing={light is None}"
                 )
-                self._optimistic_is_on = None
-                self._optimistic_brightness = None
-                self._optimistic_rgb = None
-                self._optimistic_snapshot_status = None
-                self._optimistic_set_at = None
         super()._handle_coordinator_update()
 
     @property
@@ -175,6 +178,23 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
             return None
         return (light.rgb[0], light.rgb[1], light.rgb[2])
 
+    def _schedule_optimistic_timeout(self) -> None:
+        """Schedule an active timer to force-clear optimistic state."""
+        # Cancel any existing timer (e.g., from a previous rapid command)
+        if self._optimistic_timeout_cancel is not None:
+            self._optimistic_timeout_cancel()
+
+        @callback
+        def _on_timeout(_now: Any) -> None:
+            self._optimistic_timeout_cancel = None
+            if self._optimistic_is_on is not None:
+                self._clear_optimistic_state("timeout")
+                self.async_write_ha_state()
+
+        self._optimistic_timeout_cancel = async_call_later(
+            self.hass, _OPTIMISTIC_TIMEOUT, _on_timeout
+        )
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light with optional brightness and RGB color."""
         light = self.coordinator.data.lights.get(self._act_id)
@@ -197,7 +217,6 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
 
         # Capture pre-call state so _handle_coordinator_update can detect changes
         pre_call_status = light.status
-        pre_call_time = time.monotonic()
 
         await self.coordinator.api.async_set_light_status(
             light, LightStatus.ON, brightness=brightness, rgb=rgb
@@ -205,12 +224,12 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
 
         # Optimistic update after successful API call
         self._optimistic_snapshot_status = pre_call_status
-        self._optimistic_set_at = pre_call_time
         self._optimistic_is_on = True
         if brightness is not None:
             self._optimistic_brightness = round(brightness * 255 / 100)
         if ATTR_RGB_COLOR in kwargs:
             self._optimistic_rgb = tuple(kwargs[ATTR_RGB_COLOR])
+        self._schedule_optimistic_timeout()
         _LOGGER.debug(
             "Optimistic update for light act_id=%d: is_on=%s, brightness=%s, rgb=%s",
             self._act_id,
@@ -231,13 +250,12 @@ class CameDomoticLight(CameDomoticDeviceEntity, LightEntity):
             return
         # Capture pre-call state so _handle_coordinator_update can detect changes
         pre_call_status = light.status
-        pre_call_time = time.monotonic()
 
         await self.coordinator.api.async_set_light_status(light, LightStatus.OFF)
 
         self._optimistic_snapshot_status = pre_call_status
-        self._optimistic_set_at = pre_call_time
         self._optimistic_is_on = False
+        self._schedule_optimistic_timeout()
         _LOGGER.debug(
             "Optimistic update for light act_id=%d: is_on=False",
             self._act_id,
