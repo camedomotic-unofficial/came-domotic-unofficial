@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.const import CONF_HOST
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -31,7 +32,7 @@ class CameDomoticEntity(CoordinatorEntity[CameDomoticDataUpdateCoordinator]):
         self._attr_unique_id = f"{entry_id}_{entity_key}" if entity_key else entry_id
         stored = coordinator.config_entry.data.get(CONF_SERVER_INFO, {})
         self._attr_device_info = DeviceInfo(
-            name=f"CAME Domotic ({coordinator.hass.config.location_name})",
+            name=f"CAME ETI/Domo server ({coordinator.config_entry.data[CONF_HOST]})",
             identifiers={(DOMAIN, entry_id)},
             hw_version=stored.get("board"),
             manufacturer=MANUFACTURER,

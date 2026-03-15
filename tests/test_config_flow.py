@@ -54,7 +54,7 @@ async def test_successful_config_flow(hass, bypass_test_credentials):
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == f"CAME Domotic ({MOCK_CONFIG[CONF_HOST]})"
+    assert result["title"] == f"CAME ETI/Domo server ({MOCK_CONFIG[CONF_HOST]})"
     assert result["data"] == MOCK_CONFIG_WITH_SERVER_INFO
     assert result["result"]
 
@@ -385,7 +385,7 @@ async def test_dhcp_discovery_new_device(hass, bypass_test_credentials):
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == f"CAME Domotic ({MOCK_CONFIG[CONF_HOST]})"
+    assert result["title"] == f"CAME ETI/Domo server ({MOCK_CONFIG[CONF_HOST]})"
     assert result["data"] == MOCK_CONFIG_WITH_SERVER_INFO
     assert result["result"].unique_id == MOCK_KEYCODE
 
