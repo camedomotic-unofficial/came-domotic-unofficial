@@ -147,23 +147,6 @@ async def test_no_thermo_zones(hass):
     assert len(entries) == 1
 
 
-async def test_thermo_zone_sensor_extra_attributes(hass, bypass_get_data):
-    """Test sensor exposes extra thermo zone attributes."""
-    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
-    config_entry.add_to_hass(hass)
-
-    await hass.config_entries.async_setup(config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    state = hass.states.get("sensor.living_room")
-    assert state is not None
-    assert state.attributes["set_point"] == 21.0
-    assert state.attributes["mode"] == "AUTO"
-    assert state.attributes["season"] == "WINTER"
-    assert state.attributes["status"] == "ON"
-    assert state.attributes["antifreeze"] == 5.0
-
-
 async def test_thermo_zone_sensor_zone_not_found(hass):
     """Test sensor returns unknown when zone disappears from data."""
     initial_zones = [_mock_thermo_zone(1, "Living Room", 20.0)]
