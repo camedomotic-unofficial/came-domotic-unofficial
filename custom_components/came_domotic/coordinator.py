@@ -183,33 +183,30 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             _LOGGER.warning("Error updating data: %s", exception)
             raise UpdateFailed(exception) from exception
 
-        # Floors and rooms are structural metadata — fetch best-effort so
-        # failures here don't abort the entire data update.
-        floors: list = []
-        rooms: list = []
+        # Topology (floors/rooms) is structural metadata — fetch best-effort
+        # so failures here don't abort the entire data update.
+        topology = None
         try:
-            floors = await self.api.async_get_floors()
-            rooms = await self.api.async_get_rooms()
+            topology = await self.api.async_get_topology()
         except CameDomoticApiClientAuthenticationError as exception:
-            _LOGGER.warning("Authentication failed fetching floors/rooms")
+            _LOGGER.warning("Authentication failed fetching topology")
             raise ConfigEntryAuthFailed(exception) from exception
         except CameDomoticApiClientError as err:
             _LOGGER.warning(
-                "Failed to fetch floors/rooms, continuing without area data: %s",
+                "Failed to fetch topology, continuing without area data: %s",
                 err,
             )
 
         _LOGGER.debug(
             "Full data fetch complete: %d thermo zone(s), %d scenario(s), "
             "%d opening(s), %d light(s), %d digital input(s), "
-            "%d floor(s), %d room(s)",
+            "topology=%s",
             len(thermo_zones),
             len(scenarios),
             len(openings),
             len(lights),
             len(digital_inputs),
-            len(floors),
-            len(rooms),
+            f"{len(topology.floors)} floor(s)" if topology else "unavailable",
         )
         return CameDomoticServerData(
             server_info=server_info,
@@ -218,8 +215,7 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             openings={o.open_act_id: o for o in openings},
             lights={lt.act_id: lt for lt in lights},
             digital_inputs={di.act_id: di for di in digital_inputs},
-            floors={f.id: f for f in floors},
-            rooms={r.id: r for r in rooms},
+            topology=topology,
         )
 
     def start_long_poll(self) -> None:

@@ -1277,132 +1277,69 @@ async def test_async_ping_not_initialized(hass):
         await client.async_ping()
 
 
-# --- async_get_floors ---
+# --- async_get_topology ---
 
 
-async def test_async_get_floors_success(hass):
-    """Test successful floors retrieval."""
+async def test_async_get_topology_success(hass):
+    """Test successful topology retrieval."""
     client = _make_client(hass)
     mock_api = AsyncMock()
-    mock_floors = [MagicMock(), MagicMock()]
-    mock_api.async_get_floors.return_value = mock_floors
+    mock_topology = MagicMock()
+    mock_topology.floors = [MagicMock(), MagicMock()]
+    mock_api.async_get_topology.return_value = mock_topology
 
     with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
         await client.async_connect()
 
-    result = await client.async_get_floors()
-    assert result is mock_floors
+    result = await client.async_get_topology()
+    assert result is mock_topology
 
 
-async def test_async_get_floors_auth_error(hass):
+async def test_async_get_topology_auth_error(hass):
     """Test CameDomoticAuthError raises AuthenticationError."""
     client = _make_client(hass)
     mock_api = AsyncMock()
-    mock_api.async_get_floors.side_effect = CameDomoticAuthError("bad creds")
+    mock_api.async_get_topology.side_effect = CameDomoticAuthError("bad creds")
 
     with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
         await client.async_connect()
 
     with pytest.raises(CameDomoticApiClientAuthenticationError):
-        await client.async_get_floors()
+        await client.async_get_topology()
 
 
-async def test_async_get_floors_server_error(hass):
+async def test_async_get_topology_server_error(hass):
     """Test CameDomoticServerError raises CommunicationError."""
     client = _make_client(hass)
     mock_api = AsyncMock()
-    mock_api.async_get_floors.side_effect = CameDomoticServerError("server err")
+    mock_api.async_get_topology.side_effect = CameDomoticServerError("server err")
 
     with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
         await client.async_connect()
 
     with pytest.raises(CameDomoticApiClientCommunicationError):
-        await client.async_get_floors()
+        await client.async_get_topology()
 
 
-async def test_async_get_floors_generic_error(hass):
+async def test_async_get_topology_generic_error(hass):
     """Test CameDomoticError raises ApiClientError."""
     client = _make_client(hass)
     mock_api = AsyncMock()
-    mock_api.async_get_floors.side_effect = CameDomoticError("generic")
+    mock_api.async_get_topology.side_effect = CameDomoticError("generic")
 
     with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
         await client.async_connect()
 
     with pytest.raises(CameDomoticApiClientError):
-        await client.async_get_floors()
+        await client.async_get_topology()
 
 
-async def test_async_get_floors_not_initialized(hass):
-    """Test async_get_floors raises ApiClientError when not connected."""
+async def test_async_get_topology_not_initialized(hass):
+    """Test async_get_topology raises ApiClientError when not connected."""
     client = _make_client(hass)
 
     with pytest.raises(CameDomoticApiClientError, match="Not initialized"):
-        await client.async_get_floors()
-
-
-# --- async_get_rooms ---
-
-
-async def test_async_get_rooms_success(hass):
-    """Test successful rooms retrieval."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_rooms = [MagicMock(), MagicMock()]
-    mock_api.async_get_rooms.return_value = mock_rooms
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    result = await client.async_get_rooms()
-    assert result is mock_rooms
-
-
-async def test_async_get_rooms_auth_error(hass):
-    """Test CameDomoticAuthError raises AuthenticationError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_rooms.side_effect = CameDomoticAuthError("bad creds")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticApiClientAuthenticationError):
-        await client.async_get_rooms()
-
-
-async def test_async_get_rooms_server_error(hass):
-    """Test CameDomoticServerError raises CommunicationError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_rooms.side_effect = CameDomoticServerError("server err")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticApiClientCommunicationError):
-        await client.async_get_rooms()
-
-
-async def test_async_get_rooms_generic_error(hass):
-    """Test CameDomoticError raises ApiClientError."""
-    client = _make_client(hass)
-    mock_api = AsyncMock()
-    mock_api.async_get_rooms.side_effect = CameDomoticError("generic")
-
-    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
-        await client.async_connect()
-
-    with pytest.raises(CameDomoticApiClientError):
-        await client.async_get_rooms()
-
-
-async def test_async_get_rooms_not_initialized(hass):
-    """Test async_get_rooms raises ApiClientError when not connected."""
-    client = _make_client(hass)
-
-    with pytest.raises(CameDomoticApiClientError, match="Not initialized"):
-        await client.async_get_rooms()
+        await client.async_get_topology()
 
 
 # --- async_set_thermo_season ---

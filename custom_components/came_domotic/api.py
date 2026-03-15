@@ -17,12 +17,11 @@ from aiocamedomotic.errors import (
 )
 from aiocamedomotic.models import (
     DigitalInput,
-    Floor,
     Light,
     LightStatus,
     Opening,
     OpeningStatus,
-    Room,
+    PlantTopology,
     Scenario,
     ServerInfo,
     TerminalGroup,
@@ -237,22 +236,13 @@ class CameDomoticApiClient:
         await scenario.async_activate()
 
     @_translate_errors
-    async def async_get_floors(self) -> list[Floor]:
-        """Fetch floors from the CAME Domotic server."""
+    async def async_get_topology(self) -> PlantTopology:
+        """Fetch the plant topology (floors and rooms) from the CAME server."""
         assert self._api is not None  # noqa: S101  # nosec B101
-        _LOGGER.debug("Fetching floors from %s", self._host)
-        floors = await self._api.async_get_floors()
-        _LOGGER.debug("Fetched %d floor(s)", len(floors))
-        return floors
-
-    @_translate_errors
-    async def async_get_rooms(self) -> list[Room]:
-        """Fetch rooms from the CAME Domotic server."""
-        assert self._api is not None  # noqa: S101  # nosec B101
-        _LOGGER.debug("Fetching rooms from %s", self._host)
-        rooms = await self._api.async_get_rooms()
-        _LOGGER.debug("Fetched %d room(s)", len(rooms))
-        return rooms
+        _LOGGER.debug("Fetching topology from %s", self._host)
+        topology = await self._api.async_get_topology()
+        _LOGGER.debug("Fetched topology: %d floor(s)", len(topology.floors))
+        return topology
 
     @_translate_errors
     async def async_set_thermo_season(self, season: ThermoZoneSeason) -> None:

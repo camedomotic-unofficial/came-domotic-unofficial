@@ -256,32 +256,42 @@ MOCK_DIGITAL_INPUTS = [
 ]
 
 
-def _mock_floor(floor_id, name):
-    """Create a mock Floor object."""
-    floor = MagicMock()
-    floor.id = floor_id
-    floor.name = name
-    return floor
-
-
-def _mock_room(room_id, name, floor_id=0):
-    """Create a mock Room object."""
+def _mock_topology_room(room_id, name):
+    """Create a mock TopologyRoom object."""
     room = MagicMock()
     room.id = room_id
     room.name = name
-    room.floor_id = floor_id
     return room
 
 
-MOCK_FLOORS = [
-    _mock_floor(0, "Ground Floor"),
-    _mock_floor(1, "First Floor"),
-]
+def _mock_topology_floor(floor_id, name, rooms=None):
+    """Create a mock TopologyFloor object."""
+    floor = MagicMock()
+    floor.id = floor_id
+    floor.name = name
+    floor.rooms = rooms or []
+    return floor
 
-MOCK_ROOMS = [
-    _mock_room(0, "Living Room", floor_id=0),
-    _mock_room(1, "Bedroom", floor_id=1),
-]
+
+def _mock_topology():
+    """Create a mock PlantTopology object."""
+    topology = MagicMock()
+    topology.floors = [
+        _mock_topology_floor(
+            0,
+            "Ground Floor",
+            rooms=[_mock_topology_room(0, "Living Room")],
+        ),
+        _mock_topology_floor(
+            1,
+            "First Floor",
+            rooms=[_mock_topology_room(1, "Bedroom")],
+        ),
+    ]
+    return topology
+
+
+MOCK_TOPOLOGY = _mock_topology()
 
 
 def _mock_server_info():
@@ -304,8 +314,7 @@ MOCK_SERVER_DATA = CameDomoticServerData(
     openings={o.open_act_id: o for o in MOCK_OPENINGS},
     lights={lt.act_id: lt for lt in MOCK_LIGHTS},
     digital_inputs={di.act_id: di for di in MOCK_DIGITAL_INPUTS},
-    floors={f.id: f for f in MOCK_FLOORS},
-    rooms={r.id: r for r in MOCK_ROOMS},
+    topology=MOCK_TOPOLOGY,
 )
 
 
@@ -345,12 +354,8 @@ def bypass_get_data_fixture():
             return_value=list(MOCK_DIGITAL_INPUTS),
         ),
         patch(
-            f"{_API_CLIENT}.async_get_floors",
-            return_value=list(MOCK_FLOORS),
-        ),
-        patch(
-            f"{_API_CLIENT}.async_get_rooms",
-            return_value=list(MOCK_ROOMS),
+            f"{_API_CLIENT}.async_get_topology",
+            return_value=_mock_topology(),
         ),
         patch(f"{_API_CLIENT}.async_ping", return_value=10.0),
         patch(f"{_API_CLIENT}.async_dispose"),

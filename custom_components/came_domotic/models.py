@@ -6,10 +6,9 @@ from dataclasses import dataclass, field
 
 from aiocamedomotic.models import (
     DigitalInput,
-    Floor,
     Light,
     Opening,
-    Room,
+    PlantTopology,
     Scenario,
     ServerInfo,
     ThermoZone,
@@ -39,5 +38,4 @@ class CameDomoticServerData:
     openings: dict[int, Opening] = field(default_factory=dict)
     lights: dict[int, Light] = field(default_factory=dict)
     digital_inputs: dict[int, DigitalInput] = field(default_factory=dict)
-    floors: dict[int, Floor] = field(default_factory=dict)
-    rooms: dict[int, Room] = field(default_factory=dict)
+    topology: PlantTopology | None = None

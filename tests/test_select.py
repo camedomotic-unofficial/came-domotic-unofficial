@@ -12,11 +12,10 @@ from custom_components.came_domotic.const import DOMAIN
 from custom_components.came_domotic.models import CameDomoticServerData
 
 from .conftest import (
-    MOCK_FLOORS,
-    MOCK_ROOMS,
     MOCK_THERMO_ZONES,
     _mock_server_info,
     _mock_thermo_zone,
+    _mock_topology,
 )
 from .const import MOCK_CONFIG
 
@@ -49,12 +48,8 @@ async def _setup_entry(hass, mock_zones=None):
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(
-            f"{_API_CLIENT}.async_get_floors",
-            return_value=list(MOCK_FLOORS),
-        ),
-        patch(
-            f"{_API_CLIENT}.async_get_rooms",
-            return_value=list(MOCK_ROOMS),
+            f"{_API_CLIENT}.async_get_topology",
+            return_value=_mock_topology(),
         ),
         patch(f"{_API_CLIENT}.async_ping", return_value=10.0),
         patch(f"{_API_CLIENT}.async_dispose"),

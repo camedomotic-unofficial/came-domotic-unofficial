@@ -50,17 +50,21 @@ def _get_suggested_area(
     coordinator: CameDomoticDataUpdateCoordinator,
     room_ind: int | None,
 ) -> str | None:
-    """Look up the room name for a device's room_ind.
+    """Look up the room name for a device's room_ind from topology.
 
     Returns the room name if found, or None if the room_ind is not
-    available or not found in the coordinator's room data.
+    available or not found in the coordinator's topology data.
     """
     if room_ind is None:
         return None
-    room = coordinator.data.rooms.get(room_ind)
-    if room is None:
+    topology = coordinator.data.topology
+    if topology is None:
         return None
-    return room.name
+    for floor in topology.floors:
+        for room in floor.rooms:
+            if room.id == room_ind:
+                return room.name
+    return None
 
 
 class CameDomoticDeviceEntity(CoordinatorEntity[CameDomoticDataUpdateCoordinator]):

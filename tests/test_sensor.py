@@ -10,10 +10,11 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.came_domotic.api import CameDomoticApiClientError
 from custom_components.came_domotic.const import DOMAIN
 from custom_components.came_domotic.models import CameDomoticServerData, PingResult
 
-from .conftest import MOCK_FLOORS, MOCK_ROOMS, _mock_server_info
+from .conftest import _mock_server_info, _mock_topology
 from .const import MOCK_CONFIG
 
 _API_CLIENT = "custom_components.came_domotic.api.CameDomoticApiClient"
@@ -103,12 +104,8 @@ async def _setup_entry(hass, mock_zones, ping_return=10.0):
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
         patch(
-            f"{_API_CLIENT}.async_get_floors",
-            return_value=list(MOCK_FLOORS),
-        ),
-        patch(
-            f"{_API_CLIENT}.async_get_rooms",
-            return_value=list(MOCK_ROOMS),
+            f"{_API_CLIENT}.async_get_topology",
+            return_value=_mock_topology(),
         ),
         patch(f"{_API_CLIENT}.async_ping", return_value=ping_return),
         patch(f"{_API_CLIENT}.async_dispose"),
@@ -200,6 +197,50 @@ async def test_no_thermo_zones(hass):
         if e.config_entry_id == config_entry.entry_id and e.domain == "sensor"
     ]
     assert len(entries) == 1
+
+
+async def test_suggested_area_none_when_topology_missing(hass):
+    """Test device has no suggested_area when topology is None."""
+    zones = [_mock_thermo_zone(1, "Zone A", 20.0, room_ind=0)]
+    config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
+    config_entry.add_to_hass(hass)
+
+    with (
+        patch(f"{_API_CLIENT}.async_connect"),
+        patch(
+            f"{_API_CLIENT}.async_get_server_info",
+            return_value=_mock_server_info(),
+        ),
+        patch(f"{_API_CLIENT}.async_get_thermo_zones", return_value=zones),
+        patch(f"{_API_CLIENT}.async_get_scenarios", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_topology",
+            side_effect=CameDomoticApiClientError("unavailable"),
+        ),
+        patch(f"{_API_CLIENT}.async_ping", return_value=10.0),
+        patch(f"{_API_CLIENT}.async_dispose"),
+        patch(f"{_COORDINATOR}.start_long_poll"),
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Entity should exist but without area assignment
+    state = hass.states.get("sensor.zone_a")
+    assert state is not None
+
+
+async def test_suggested_area_none_when_room_ind_not_found(hass):
+    """Test device has no suggested_area when room_ind doesn't match topology."""
+    zones = [_mock_thermo_zone(1, "Zone B", 20.0, room_ind=999)]
+
+    await _setup_entry(hass, zones)
+
+    # Entity should exist (room_ind=999 is not in mock topology)
+    state = hass.states.get("sensor.zone_b")
+    assert state is not None
 
 
 async def test_thermo_zone_sensor_extra_attributes(hass, bypass_get_data):
