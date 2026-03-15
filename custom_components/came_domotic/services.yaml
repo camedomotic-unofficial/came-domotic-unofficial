@@ -71,3 +71,11 @@ get_users:
       selector:
         config_entry:
           integration: came_domotic
+
+force_refresh:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: came_domotic

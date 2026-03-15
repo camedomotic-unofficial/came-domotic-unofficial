@@ -148,6 +148,16 @@
           "description": "The CAME Domotic server to query."
         }
       }
+    },
+    "force_refresh": {
+      "name": "Force refresh",
+      "description": "Force a full data refresh of all devices from the CAME Domotic server.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config entry",
+          "description": "The CAME Domotic server to refresh."
+        }
+      }
     }
   },
   "exceptions": {

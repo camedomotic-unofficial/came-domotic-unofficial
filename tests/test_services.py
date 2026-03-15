@@ -25,6 +25,7 @@ from custom_components.came_domotic.services import (
     SERVICE_CHANGE_PASSWORD,
     SERVICE_CREATE_USER,
     SERVICE_DELETE_USER,
+    SERVICE_FORCE_REFRESH,
     SERVICE_GET_TERMINAL_GROUPS,
     SERVICE_GET_USERS,
 )
@@ -941,6 +942,112 @@ async def test_get_users_comm_error(hass, bypass_get_data):
         )
 
 
+# --- force_refresh ---
+
+
+async def test_force_refresh_success(hass, bypass_get_data):
+    """Test successful force refresh via service."""
+    config_entry = await _setup_entry(hass)
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_FORCE_REFRESH,
+        {"config_entry_id": "test"},
+        blocking=True,
+    )
+
+    # No error means refresh succeeded; bypass_get_data mocks all API calls
+    assert config_entry.state is ConfigEntryState.LOADED
+
+
+async def test_force_refresh_entry_not_found(hass, bypass_get_data):
+    """Test force_refresh raises ServiceValidationError for unknown entry."""
+    await _setup_entry(hass)
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FORCE_REFRESH,
+            {"config_entry_id": "nonexistent"},
+            blocking=True,
+        )
+
+
+async def test_force_refresh_entry_not_loaded(hass, bypass_get_data):
+    """Test force_refresh raises ServiceValidationError for unloaded entry."""
+    # Set up two entries so unloading one doesn't remove services
+    config_entry_1 = MockConfigEntry(
+        domain=DOMAIN, data=MOCK_CONFIG, entry_id="test1", unique_id="server1"
+    )
+    config_entry_1.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(config_entry_1.entry_id)
+    await hass.async_block_till_done()
+
+    config_entry_2 = MockConfigEntry(
+        domain=DOMAIN, data=MOCK_CONFIG, entry_id="test2", unique_id="server2"
+    )
+    config_entry_2.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry_2.entry_id)
+    await hass.async_block_till_done()
+
+    # Unload entry 1 but keep entry 2 loaded (services remain)
+    await hass.config_entries.async_unload(config_entry_1.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FORCE_REFRESH,
+            {"config_entry_id": "test1"},
+            blocking=True,
+        )
+
+
+async def test_force_refresh_auth_error(hass, bypass_get_data):
+    """Test force_refresh raises HomeAssistantError on auth failure."""
+    config_entry = await _setup_entry(hass)
+    coordinator = config_entry.runtime_data.coordinator
+
+    async def _fake_refresh():
+        coordinator.last_update_success = False
+        coordinator.last_exception = CameDomoticApiClientAuthenticationError(
+            "bad creds"
+        )
+
+    with (
+        patch.object(coordinator, "async_refresh", side_effect=_fake_refresh),
+        pytest.raises(HomeAssistantError),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FORCE_REFRESH,
+            {"config_entry_id": "test"},
+            blocking=True,
+        )
+
+
+async def test_force_refresh_comm_error(hass, bypass_get_data):
+    """Test force_refresh raises HomeAssistantError on communication failure."""
+    config_entry = await _setup_entry(hass)
+    coordinator = config_entry.runtime_data.coordinator
+
+    async def _fake_refresh():
+        coordinator.last_update_success = False
+        coordinator.last_exception = CameDomoticApiClientCommunicationError("timeout")
+
+    with (
+        patch.object(coordinator, "async_refresh", side_effect=_fake_refresh),
+        pytest.raises(HomeAssistantError),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_FORCE_REFRESH,
+            {"config_entry_id": "test"},
+            blocking=True,
+        )
+
+
 # --- Service registration lifecycle ---
 
 
@@ -953,6 +1060,7 @@ async def test_services_registered_after_setup(hass, bypass_get_data):
     assert hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_USERS)
+    assert hass.services.has_service(DOMAIN, SERVICE_FORCE_REFRESH)
 
 
 async def test_services_removed_after_last_entry_unloaded(hass, bypass_get_data):
@@ -971,6 +1079,7 @@ async def test_services_removed_after_last_entry_unloaded(hass, bypass_get_data)
     assert not hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert not hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
     assert not hass.services.has_service(DOMAIN, SERVICE_GET_USERS)
+    assert not hass.services.has_service(DOMAIN, SERVICE_FORCE_REFRESH)
 
 
 async def test_services_kept_when_other_entries_loaded(hass, bypass_get_data):
@@ -1000,3 +1109,4 @@ async def test_services_kept_when_other_entries_loaded(hass, bypass_get_data):
     assert hass.services.has_service(DOMAIN, SERVICE_CHANGE_PASSWORD)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_TERMINAL_GROUPS)
     assert hass.services.has_service(DOMAIN, SERVICE_GET_USERS)
+    assert hass.services.has_service(DOMAIN, SERVICE_FORCE_REFRESH)

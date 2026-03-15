@@ -13,7 +13,10 @@ from homeassistant.core import (
     ServiceResponse,
     SupportsResponse,
 )
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import (
+    HomeAssistantError,
+    ServiceValidationError,
+)
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 
@@ -35,6 +38,7 @@ SERVICE_DELETE_USER = "delete_user"
 SERVICE_CHANGE_PASSWORD = "change_password"  # noqa: S105  # nosec B105
 SERVICE_GET_TERMINAL_GROUPS = "get_terminal_groups"
 SERVICE_GET_USERS = "get_users"
+SERVICE_FORCE_REFRESH = "force_refresh"
 
 # Field attribute names
 ATTR_USERNAME = "username"
@@ -76,6 +80,12 @@ SERVICE_GET_TERMINAL_GROUPS_SCHEMA = vol.Schema(
 )
 
 SERVICE_GET_USERS_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
+    }
+)
+
+SERVICE_FORCE_REFRESH_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
     }
@@ -337,6 +347,26 @@ async def async_handle_get_users(call: ServiceCall) -> ServiceResponse:
     return {"users": [{"name": user.name} for user in users]}
 
 
+async def async_handle_force_refresh(call: ServiceCall) -> None:
+    """Handle the force_refresh service call."""
+    hass = call.hass
+    entry, _ = _get_entry_and_client(hass, call)
+    coordinator = entry.runtime_data.coordinator
+
+    _LOGGER.debug("Service call: forcing full data refresh")
+
+    await coordinator.async_refresh()
+
+    if not coordinator.last_update_success:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="service_comm_error",
+            translation_placeholders={"error": str(coordinator.last_exception)},
+        )
+
+    _LOGGER.debug("Full data refresh completed successfully")
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration services (idempotent)."""
     if hass.services.has_service(DOMAIN, SERVICE_CREATE_USER):
@@ -374,6 +404,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=SERVICE_GET_USERS_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_FORCE_REFRESH,
+        async_handle_force_refresh,
+        schema=SERVICE_FORCE_REFRESH_SCHEMA,
+    )
 
     _LOGGER.debug("Registered %s services", DOMAIN)
 
@@ -395,6 +431,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         SERVICE_CHANGE_PASSWORD,
         SERVICE_GET_TERMINAL_GROUPS,
         SERVICE_GET_USERS,
+        SERVICE_FORCE_REFRESH,
     ):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
