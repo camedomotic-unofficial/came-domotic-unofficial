@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 from aiocamedomotic.models import LightStatus, LightType
 from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGB_COLOR, ColorMode
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.came_domotic.api import (
     CameDomoticApiClientCommunicationError,
@@ -844,3 +849,92 @@ class TestLightOptimisticState:
         state = hass.states.get("light.hallway_light")
         assert state is not None
         assert state.state == "on"
+
+    async def test_light_optimistic_timeout_resets_on_rapid_commands(self, hass):
+        """Test rapid on/off cancels the first timer and starts a new one."""
+        lights = [_mock_light(300, "Hallway Light", status=LightStatus.OFF)]
+        config_entry = await _setup_entry(hass, lights)
+
+        coordinator = config_entry.runtime_data.coordinator
+
+        with patch.object(coordinator.api, "async_set_light_status", AsyncMock()):
+            # First command: turn on
+            await hass.services.async_call(
+                "light",
+                "turn_on",
+                {"entity_id": "light.hallway_light"},
+                blocking=True,
+            )
+            # Second command: turn off (cancels first timer, starts new one)
+            await hass.services.async_call(
+                "light",
+                "turn_off",
+                {"entity_id": "light.hallway_light"},
+                blocking=True,
+            )
+
+        state = hass.states.get("light.hallway_light")
+        assert state.state == "off"
+
+        # Advance past timeout — timer from turn_off fires
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=8))
+        await hass.async_block_till_done()
+
+        # Optimistic cleared; entity reads coordinator data (OFF, since
+        # the mock API didn't actually mutate the light object)
+        state = hass.states.get("light.hallway_light")
+        assert state.state == "off"
+
+    async def test_light_optimistic_timeout_clears_state(self, hass):
+        """Test optimistic state is force-cleared after timeout.
+
+        Verifies the active timer fires even without coordinator updates,
+        preventing stale optimistic state from persisting indefinitely.
+        """
+        lights = [_mock_light(300, "Hallway Light", status=LightStatus.OFF)]
+        config_entry = await _setup_entry(hass, lights)
+
+        coordinator = config_entry.runtime_data.coordinator
+
+        # Turn on optimistically (underlying data stays OFF)
+        with patch.object(coordinator.api, "async_set_light_status", AsyncMock()):
+            await hass.services.async_call(
+                "light",
+                "turn_on",
+                {"entity_id": "light.hallway_light"},
+                blocking=True,
+            )
+
+        state = hass.states.get("light.hallway_light")
+        assert state.state == "on"
+
+        # Advance time past the optimistic timeout (7 seconds)
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=8))
+        await hass.async_block_till_done()
+
+        # Optimistic state cleared; entity reads coordinator data (OFF)
+        state = hass.states.get("light.hallway_light")
+        assert state.state == "off"
+
+    async def test_light_optimistic_timeout_cancelled_on_removal(self, hass):
+        """Test pending optimistic timeout is cancelled when entity is removed."""
+        lights = [_mock_light(300, "Hallway Light", status=LightStatus.OFF)]
+        config_entry = await _setup_entry(hass, lights)
+
+        coordinator = config_entry.runtime_data.coordinator
+
+        with patch.object(coordinator.api, "async_set_light_status", AsyncMock()):
+            await hass.services.async_call(
+                "light",
+                "turn_on",
+                {"entity_id": "light.hallway_light"},
+                blocking=True,
+            )
+
+        # Unload the entry (triggers async_will_remove_from_hass)
+        await hass.config_entries.async_unload(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+        # Advance time past the timeout — should not raise or write state
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=8))
+        await hass.async_block_till_done()
