@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from aiocamedomotic.models import AnalogSensorType
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfPressure, UnitOfTemperature
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -13,7 +14,9 @@ from custom_components.came_domotic.const import DOMAIN
 from custom_components.came_domotic.models import CameDomoticServerData, PingResult
 
 from .conftest import (
+    MOCK_ANALOG_SENSORS,
     MOCK_THERMO_ZONES,
+    _mock_analog_sensor,
     _mock_server_info,
     _mock_thermo_zone,
     _mock_topology,
@@ -27,10 +30,14 @@ _COORDINATOR = (
 )
 
 
-async def _setup_entry(hass, mock_zones=None, ping_return=10.0):
-    """Set up a config entry with the given mock thermo zones list."""
+async def _setup_entry(
+    hass, mock_zones=None, mock_analog_sensors=None, ping_return=10.0
+):
+    """Set up a config entry with the given mock device lists."""
     if mock_zones is None:
         mock_zones = list(MOCK_THERMO_ZONES)
+    if mock_analog_sensors is None:
+        mock_analog_sensors = list(MOCK_ANALOG_SENSORS)
     config_entry = MockConfigEntry(domain=DOMAIN, data=MOCK_CONFIG, entry_id="test")
     config_entry.add_to_hass(hass)
 
@@ -48,6 +55,10 @@ async def _setup_entry(hass, mock_zones=None, ping_return=10.0):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(
+            f"{_API_CLIENT}.async_get_analog_sensors",
+            return_value=mock_analog_sensors,
+        ),
         patch(
             f"{_API_CLIENT}.async_get_topology",
             return_value=_mock_topology(),
@@ -79,7 +90,8 @@ async def test_thermo_zone_sensors_created(hass, bypass_get_data):
         for e in registry.entities.values()
         if e.config_entry_id == config_entry.entry_id and e.domain == "sensor"
     ]
-    assert len(entries) == 3
+    # 2 thermo zones + 1 latency + 2 analog sensors = 5
+    assert len(entries) == 5
 
 
 async def test_thermo_zone_sensor_state(hass, bypass_get_data):
@@ -131,12 +143,14 @@ async def test_thermo_zone_sensor_unique_id(hass, bypass_get_data):
         "test_thermo_zone_1_temperature",
         "test_thermo_zone_52_temperature",
         "test_ping_latency",
+        "test_analog_sensor_500_analog_temperature",
+        "test_analog_sensor_501_analog_humidity",
     }
 
 
 async def test_no_thermo_zones(hass):
-    """Test only the latency sensor is created when there are no thermo zones."""
-    config_entry = await _setup_entry(hass, mock_zones=[])
+    """Test only the latency sensor is created when there are no device sensors."""
+    config_entry = await _setup_entry(hass, mock_zones=[], mock_analog_sensors=[])
 
     registry = er.async_get(hass)
     entries = [
@@ -234,3 +248,140 @@ def test_server_latency_native_value():
 
     coordinator.data = PingResult(connected=False, latency_ms=None)
     assert entity.native_value is None
+
+
+# --- Analog sensor tests ---
+
+
+async def test_analog_sensor_created(hass):
+    """Test analog sensor entities are created."""
+    config_entry = await _setup_entry(hass, mock_zones=[])
+
+    registry = er.async_get(hass)
+    entries = [
+        e
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id
+        and e.domain == "sensor"
+        and "analog_sensor" in e.unique_id
+    ]
+    assert len(entries) == 2
+
+
+async def test_analog_sensor_state(hass):
+    """Test analog sensor states match sensor values."""
+    await _setup_entry(hass, mock_zones=[])
+
+    state = hass.states.get("sensor.outdoor_temperature")
+    assert state is not None
+    assert state.state == "15.5"
+
+    state = hass.states.get("sensor.indoor_humidity")
+    assert state is not None
+    assert state.state == "45.0"
+
+
+async def test_analog_sensor_temperature_attributes(hass):
+    """Test temperature analog sensor attributes are correctly set."""
+    await _setup_entry(hass, mock_zones=[])
+
+    state = hass.states.get("sensor.outdoor_temperature")
+    assert state.attributes["device_class"] == SensorDeviceClass.TEMPERATURE
+    assert state.attributes["state_class"] == SensorStateClass.MEASUREMENT
+    assert state.attributes["unit_of_measurement"] == UnitOfTemperature.CELSIUS
+
+
+async def test_analog_sensor_humidity_attributes(hass):
+    """Test humidity analog sensor attributes are correctly set."""
+    await _setup_entry(hass, mock_zones=[])
+
+    state = hass.states.get("sensor.indoor_humidity")
+    assert state.attributes["device_class"] == SensorDeviceClass.HUMIDITY
+    assert state.attributes["state_class"] == SensorStateClass.MEASUREMENT
+    assert state.attributes["unit_of_measurement"] == PERCENTAGE
+
+
+async def test_analog_sensor_unique_ids(hass):
+    """Test analog sensor unique IDs follow the expected pattern."""
+    config_entry = await _setup_entry(hass, mock_zones=[])
+
+    registry = er.async_get(hass)
+    unique_ids = {
+        e.unique_id
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id and "analog_sensor" in e.unique_id
+    }
+    assert unique_ids == {
+        "test_analog_sensor_500_analog_temperature",
+        "test_analog_sensor_501_analog_humidity",
+    }
+
+
+async def test_no_analog_sensors(hass):
+    """Test no analog sensor entities when list is empty."""
+    config_entry = await _setup_entry(hass, mock_zones=[], mock_analog_sensors=[])
+
+    registry = er.async_get(hass)
+    entries = [
+        e
+        for e in registry.entities.values()
+        if e.config_entry_id == config_entry.entry_id and "analog_sensor" in e.unique_id
+    ]
+    assert len(entries) == 0
+
+
+async def test_analog_sensor_disappears(hass):
+    """Test analog sensor returns unknown when sensor disappears from data."""
+    initial = [_mock_analog_sensor(500, "Outdoor Temperature", 15.5)]
+    config_entry = await _setup_entry(hass, mock_zones=[], mock_analog_sensors=initial)
+
+    coordinator = config_entry.runtime_data.coordinator
+    empty_data = CameDomoticServerData(server_info=_mock_server_info())
+
+    with patch.object(coordinator, "_async_update_data", return_value=empty_data):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.outdoor_temperature")
+    assert state is not None
+    assert state.state == "unknown"
+
+
+async def test_analog_sensor_unknown_type(hass):
+    """Test UNKNOWN sensor type creates a generic sensor entity."""
+    sensors = [
+        _mock_analog_sensor(
+            600,
+            "Mystery Sensor",
+            42.0,
+            unit="ppm",
+            sensor_type=AnalogSensorType.UNKNOWN,
+        )
+    ]
+    await _setup_entry(hass, mock_zones=[], mock_analog_sensors=sensors)
+
+    state = hass.states.get("sensor.mystery_sensor")
+    assert state is not None
+    assert state.state == "42.0"
+    assert state.attributes.get("device_class") is None
+    assert state.attributes["unit_of_measurement"] == "ppm"
+
+
+async def test_analog_sensor_pressure(hass):
+    """Test pressure analog sensor attributes."""
+    sensors = [
+        _mock_analog_sensor(
+            700,
+            "Barometer",
+            1013.25,
+            unit="hPa",
+            sensor_type=AnalogSensorType.PRESSURE,
+        )
+    ]
+    await _setup_entry(hass, mock_zones=[], mock_analog_sensors=sensors)
+
+    state = hass.states.get("sensor.barometer")
+    assert state is not None
+    assert state.state == "1013.25"
+    assert state.attributes["device_class"] == SensorDeviceClass.ATMOSPHERIC_PRESSURE
+    assert state.attributes["unit_of_measurement"] == UnitOfPressure.HPA

@@ -178,6 +178,7 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             openings = await self.api.async_get_openings()
             lights = await self.api.async_get_lights()
             digital_inputs = await self.api.async_get_digital_inputs()
+            analog_sensors = await self.api.async_get_analog_sensors()
         except CameDomoticApiClientAuthenticationError as exception:
             _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
@@ -206,12 +207,13 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
         _LOGGER.debug(
             "Full data fetch complete: %d thermo zone(s), %d scenario(s), "
             "%d opening(s), %d light(s), %d digital input(s), "
-            "topology=%s",
+            "%d analog sensor(s), topology=%s",
             len(thermo_zones),
             len(scenarios),
             len(openings),
             len(lights),
             len(digital_inputs),
+            len(analog_sensors),
             f"{len(topology.floors)} floor(s)" if topology else "unavailable",
         )
         return CameDomoticServerData(
@@ -221,6 +223,7 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             openings={o.open_act_id: o for o in openings},
             lights={lt.act_id: lt for lt in lights},
             digital_inputs={di.act_id: di for di in digital_inputs},
+            analog_sensors={s.act_id: s for s in analog_sensors},
             topology=topology,
         )
 

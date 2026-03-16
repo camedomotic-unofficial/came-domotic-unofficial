@@ -836,6 +836,70 @@ async def test_async_get_digital_inputs_not_initialized(hass):
         await client.async_get_digital_inputs()
 
 
+# --- async_get_analog_sensors ---
+
+
+async def test_async_get_analog_sensors_success(hass):
+    """Test successful analog sensors retrieval."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_sensors = [MagicMock(), MagicMock()]
+    mock_api.async_get_analog_sensors.return_value = mock_sensors
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    result = await client.async_get_analog_sensors()
+    assert result is mock_sensors
+
+
+async def test_async_get_analog_sensors_auth_error(hass):
+    """Test CameDomoticAuthError raises AuthenticationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_analog_sensors.side_effect = CameDomoticAuthError("bad creds")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientAuthenticationError):
+        await client.async_get_analog_sensors()
+
+
+async def test_async_get_analog_sensors_server_error(hass):
+    """Test CameDomoticServerError raises CommunicationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_analog_sensors.side_effect = CameDomoticServerError("server err")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientCommunicationError):
+        await client.async_get_analog_sensors()
+
+
+async def test_async_get_analog_sensors_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_analog_sensors.side_effect = CameDomoticError("generic")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientError):
+        await client.async_get_analog_sensors()
+
+
+async def test_async_get_analog_sensors_not_initialized(hass):
+    """Test async_get_analog_sensors raises ApiClientError when not connected."""
+    client = _make_client(hass)
+
+    with pytest.raises(CameDomoticApiClientError, match="Not initialized"):
+        await client.async_get_analog_sensors()
+
+
 # --- async_get_users ---
 
 

@@ -39,6 +39,7 @@ async def _setup_entry(hass, mock_scenarios):
         patch(f"{_API_CLIENT}.async_get_openings", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_lights", return_value=[]),
         patch(f"{_API_CLIENT}.async_get_digital_inputs", return_value=[]),
+        patch(f"{_API_CLIENT}.async_get_analog_sensors", return_value=[]),
         patch(
             f"{_API_CLIENT}.async_get_topology",
             return_value=_mock_topology(),
