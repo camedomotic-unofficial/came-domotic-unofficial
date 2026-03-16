@@ -5,10 +5,8 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-from homeassistant.components.camera import CameraEntityFeature, async_get_image
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.components.camera import CameraEntityFeature
 from homeassistant.helpers import entity_registry as er
-import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.came_domotic.api import (
@@ -36,6 +34,14 @@ def _mock_aiohttp_get(resp=None, side_effect=None):
         cm.__aenter__ = AsyncMock(return_value=resp)
     cm.__aexit__ = AsyncMock(return_value=False)
     return MagicMock(return_value=cm)
+
+
+def _get_camera_entity(hass, entity_id="camera.front_door_camera"):
+    """Return the camera entity object for the given entity_id."""
+    for state in hass.states.async_all("camera"):
+        if state.entity_id == entity_id:
+            return hass.data["camera"].get_entity(state.entity_id)
+    return None
 
 
 async def _setup_entry(hass, mock_cameras):
@@ -294,13 +300,16 @@ async def test_camera_image_success(hass):
     mock_session = MagicMock()
     mock_session.get = _mock_aiohttp_get(resp=mock_resp)
 
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+
     with patch(
         "custom_components.came_domotic.camera.async_get_clientsession",
         return_value=mock_session,
     ):
-        image = await async_get_image(hass, "camera.front_door_camera")
+        result = await entity.async_camera_image()
 
-    assert image.content == b"\xff\xd8\xff\xe0fake-jpeg"
+    assert result == b"\xff\xd8\xff\xe0fake-jpeg"
 
 
 async def test_camera_image_timeout(hass):
@@ -317,14 +326,16 @@ async def test_camera_image_timeout(hass):
     mock_session = MagicMock()
     mock_session.get = _mock_aiohttp_get(side_effect=TimeoutError)
 
-    with (
-        patch(
-            "custom_components.came_domotic.camera.async_get_clientsession",
-            return_value=mock_session,
-        ),
-        pytest.raises(HomeAssistantError),
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+
+    with patch(
+        "custom_components.came_domotic.camera.async_get_clientsession",
+        return_value=mock_session,
     ):
-        await async_get_image(hass, "camera.front_door_camera")
+        result = await entity.async_camera_image()
+
+    assert result is None
 
 
 async def test_camera_image_client_error(hass):
@@ -341,14 +352,16 @@ async def test_camera_image_client_error(hass):
     mock_session = MagicMock()
     mock_session.get = _mock_aiohttp_get(side_effect=aiohttp.ClientError)
 
-    with (
-        patch(
-            "custom_components.came_domotic.camera.async_get_clientsession",
-            return_value=mock_session,
-        ),
-        pytest.raises(HomeAssistantError),
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+
+    with patch(
+        "custom_components.came_domotic.camera.async_get_clientsession",
+        return_value=mock_session,
     ):
-        await async_get_image(hass, "camera.front_door_camera")
+        result = await entity.async_camera_image()
+
+    assert result is None
 
 
 async def test_camera_image_non_200(hass):
@@ -369,14 +382,16 @@ async def test_camera_image_non_200(hass):
     mock_session = MagicMock()
     mock_session.get = _mock_aiohttp_get(resp=mock_resp)
 
-    with (
-        patch(
-            "custom_components.came_domotic.camera.async_get_clientsession",
-            return_value=mock_session,
-        ),
-        pytest.raises(HomeAssistantError),
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+
+    with patch(
+        "custom_components.came_domotic.camera.async_get_clientsession",
+        return_value=mock_session,
     ):
-        await async_get_image(hass, "camera.front_door_camera")
+        result = await entity.async_camera_image()
+
+    assert result is None
 
 
 async def test_camera_image_bad_content_type(hass):
@@ -397,14 +412,16 @@ async def test_camera_image_bad_content_type(hass):
     mock_session = MagicMock()
     mock_session.get = _mock_aiohttp_get(resp=mock_resp)
 
-    with (
-        patch(
-            "custom_components.came_domotic.camera.async_get_clientsession",
-            return_value=mock_session,
-        ),
-        pytest.raises(HomeAssistantError),
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+
+    with patch(
+        "custom_components.came_domotic.camera.async_get_clientsession",
+        return_value=mock_session,
     ):
-        await async_get_image(hass, "camera.front_door_camera")
+        result = await entity.async_camera_image()
+
+    assert result is None
 
 
 async def test_camera_image_no_still_uri(hass):
@@ -419,8 +436,10 @@ async def test_camera_image_no_still_uri(hass):
     ]
     await _setup_entry(hass, cameras)
 
-    with pytest.raises(HomeAssistantError):
-        await async_get_image(hass, "camera.front_door_camera")
+    entity = _get_camera_entity(hass)
+    assert entity is not None
+    result = await entity.async_camera_image()
+    assert result is None
 
 
 # --- Extra state attributes ---
