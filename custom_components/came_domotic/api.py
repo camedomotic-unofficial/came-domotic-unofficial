@@ -16,6 +16,7 @@ from aiocamedomotic.errors import (
     CameDomoticServerNotFoundError,
 )
 from aiocamedomotic.models import (
+    AnalogSensor,
     DigitalInput,
     Light,
     LightStatus,
@@ -187,6 +188,15 @@ class CameDomoticApiClient:
         digital_inputs = await self._api.async_get_digital_inputs()
         _LOGGER.debug("Fetched %d digital input(s)", len(digital_inputs))
         return digital_inputs
+
+    @_translate_errors
+    async def async_get_analog_sensors(self) -> list[AnalogSensor]:
+        """Fetch analog sensors from the CAME Domotic server."""
+        assert self._api is not None  # noqa: S101  # nosec B101
+        _LOGGER.debug("Fetching analog sensors from %s", self._host)
+        sensors = await self._api.async_get_analog_sensors()
+        _LOGGER.debug("Fetched %d analog sensor(s)", len(sensors))
+        return sensors
 
     @_translate_errors
     async def async_set_light_status(

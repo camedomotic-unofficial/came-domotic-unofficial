@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from aiocamedomotic.models import (
+    AnalogSensorType,
     DigitalInputStatus,
     DigitalInputType,
     LightStatus,
@@ -277,6 +278,50 @@ MOCK_DIGITAL_INPUTS = [
 ]
 
 
+def _mock_analog_sensor(
+    act_id,
+    name,
+    value,
+    unit="C",
+    sensor_type=AnalogSensorType.TEMPERATURE,
+):
+    """Create a mock AnalogSensor object with all required attributes.
+
+    Includes a raw_data dict so that coordinator logic works correctly in tests.
+    """
+    sensor = MagicMock()
+    sensor.act_id = act_id
+    sensor.name = name
+    sensor.value = value
+    sensor.unit = unit
+    sensor.sensor_type = sensor_type
+    sensor.raw_data = {
+        "act_id": act_id,
+        "name": name,
+        "value": value,
+        "unit": unit,
+    }
+    return sensor
+
+
+MOCK_ANALOG_SENSORS = [
+    _mock_analog_sensor(
+        500,
+        "Outdoor Temperature",
+        15.5,
+        unit="C",
+        sensor_type=AnalogSensorType.TEMPERATURE,
+    ),
+    _mock_analog_sensor(
+        501,
+        "Indoor Humidity",
+        45.0,
+        unit="%",
+        sensor_type=AnalogSensorType.HUMIDITY,
+    ),
+]
+
+
 def _mock_topology_room(room_id, name):
     """Create a mock TopologyRoom object."""
     room = MagicMock()
@@ -335,6 +380,7 @@ MOCK_SERVER_DATA = CameDomoticServerData(
     openings={o.open_act_id: o for o in MOCK_OPENINGS},
     lights={lt.act_id: lt for lt in MOCK_LIGHTS},
     digital_inputs={di.act_id: di for di in MOCK_DIGITAL_INPUTS},
+    analog_sensors={s.act_id: s for s in MOCK_ANALOG_SENSORS},
     topology=MOCK_TOPOLOGY,
 )
 
@@ -373,6 +419,10 @@ def bypass_get_data_fixture():
         patch(
             f"{_API_CLIENT}.async_get_digital_inputs",
             return_value=list(MOCK_DIGITAL_INPUTS),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_analog_sensors",
+            return_value=list(MOCK_ANALOG_SENSORS),
         ),
         patch(
             f"{_API_CLIENT}.async_get_topology",

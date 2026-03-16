@@ -6,14 +6,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 import logging
 
-from aiocamedomotic.models import ThermoZone
+from aiocamedomotic.models import AnalogSensor, AnalogSensorType, ThermoZone
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfPressure,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -46,6 +52,58 @@ THERMO_ZONE_SENSORS: tuple[CameDomoticSensorDescription, ...] = (
 )
 
 
+@dataclass(frozen=True, kw_only=True)
+class CameDomoticAnalogSensorDescription(SensorEntityDescription):
+    """Describes a CAME Domotic analog sensor entity."""
+
+    value_fn: Callable[[AnalogSensor], float | None]
+
+
+ANALOG_SENSOR_DESCRIPTIONS: dict[
+    AnalogSensorType, CameDomoticAnalogSensorDescription
+] = {
+    AnalogSensorType.TEMPERATURE: CameDomoticAnalogSensorDescription(
+        key="analog_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda sensor: sensor.value,
+    ),
+    AnalogSensorType.HUMIDITY: CameDomoticAnalogSensorDescription(
+        key="analog_humidity",
+        device_class=SensorDeviceClass.HUMIDITY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda sensor: sensor.value,
+    ),
+    AnalogSensorType.PRESSURE: CameDomoticAnalogSensorDescription(
+        key="analog_pressure",
+        device_class=SensorDeviceClass.ATMOSPHERIC_PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.HPA,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda sensor: sensor.value,
+    ),
+}
+
+
+def _get_analog_sensor_description(
+    sensor: AnalogSensor,
+) -> CameDomoticAnalogSensorDescription:
+    """Return the entity description for an analog sensor based on its type."""
+    known = ANALOG_SENSOR_DESCRIPTIONS.get(sensor.sensor_type)
+    if known is not None:
+        return known
+    return CameDomoticAnalogSensorDescription(
+        key="analog_unknown",
+        native_unit_of_measurement=sensor.unit or None,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda s: s.value,
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: CameDomoticConfigEntry,
@@ -55,7 +113,12 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.coordinator
     ping_coordinator = entry.runtime_data.ping_coordinator
     zones = coordinator.data.thermo_zones
-    _LOGGER.debug("Setting up %d thermo zone sensor(s)", len(zones))
+    analog_sensors = coordinator.data.analog_sensors
+    _LOGGER.debug(
+        "Setting up %d thermo zone sensor(s) and %d analog sensor(s)",
+        len(zones),
+        len(analog_sensors),
+    )
     async_add_entities(
         [
             CameDomoticServerLatencySensor(ping_coordinator, entry.entry_id),
@@ -70,6 +133,15 @@ async def async_setup_entry(
                 )
                 for act_id, zone in zones.items()
                 for description in THERMO_ZONE_SENSORS
+            ),
+            *(
+                CameDomoticAnalogSensorEntity(
+                    coordinator,
+                    act_id,
+                    sensor.name,
+                    _get_analog_sensor_description(sensor),
+                )
+                for act_id, sensor in analog_sensors.items()
             ),
         ]
     )
@@ -145,3 +217,38 @@ class CameDomoticServerLatencySensor(
     def native_value(self) -> float | None:
         """Return the last measured round-trip latency in milliseconds."""
         return self.coordinator.data.latency_ms
+
+
+class CameDomoticAnalogSensorEntity(CameDomoticDeviceEntity, SensorEntity):
+    """Sensor entity for a CAME Domotic analog sensor."""
+
+    entity_description: CameDomoticAnalogSensorDescription
+
+    def __init__(
+        self,
+        coordinator: CameDomoticDataUpdateCoordinator,
+        act_id: int,
+        sensor_name: str,
+        description: CameDomoticAnalogSensorDescription,
+    ) -> None:
+        """Initialize the analog sensor entity."""
+        super().__init__(
+            coordinator,
+            entity_key=f"analog_sensor_{act_id}_{description.key}",
+            device_name=sensor_name,
+            device_id=f"analog_sensor_{act_id}",
+            floor_ind=None,
+            room_ind=None,
+        )
+        self.entity_description = description
+        self._act_id = act_id
+        self._attr_has_entity_name = False
+        self._attr_name = sensor_name
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current value of the analog sensor."""
+        sensor = self.coordinator.data.analog_sensors.get(self._act_id)
+        if sensor is None:
+            return None
+        return self.entity_description.value_fn(sensor)
