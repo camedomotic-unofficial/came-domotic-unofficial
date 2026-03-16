@@ -224,7 +224,7 @@ class CameDomoticApiClient:
     async def async_get_map_pages(self) -> list[MapPage]:
         """Fetch map pages (floor plans) from the CAME Domotic server."""
         assert self._api is not None  # noqa: S101  # nosec B101
-        _LOGGER.debug("Fetching maps pages from %s", self._host)
+        _LOGGER.debug("Fetching map pages from %s", self._host)
         pages = await self._api.async_get_map_pages()
         _LOGGER.debug("Fetched %d map page(s)", len(pages))
         return pages

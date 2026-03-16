@@ -113,7 +113,7 @@ class CameDomoticMapImage(CameDomoticEntity, ImageEntity):
             return None
 
         host = self.coordinator.config_entry.data[CONF_HOST]
-        encoded_bg = quote(page.background, safe="/")
+        encoded_bg = quote(page.background.lstrip("/"), safe="/")
         url = f"http://{host}/{encoded_bg}"
 
         try:
