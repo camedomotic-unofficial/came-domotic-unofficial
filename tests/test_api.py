@@ -900,6 +900,178 @@ async def test_async_get_analog_sensors_not_initialized(hass):
         await client.async_get_analog_sensors()
 
 
+# --- async_get_relays ---
+
+
+async def test_async_get_relays_success(hass):
+    """Test successful relays retrieval."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relays = [MagicMock(), MagicMock()]
+    mock_api.async_get_relays.return_value = mock_relays
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    result = await client.async_get_relays()
+    assert result is mock_relays
+
+
+async def test_async_get_relays_auth_error(hass):
+    """Test CameDomoticAuthError raises AuthenticationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_relays.side_effect = CameDomoticAuthError("bad creds")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientAuthenticationError):
+        await client.async_get_relays()
+
+
+async def test_async_get_relays_server_error(hass):
+    """Test CameDomoticServerError raises CommunicationError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_relays.side_effect = CameDomoticServerError("server err")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientCommunicationError):
+        await client.async_get_relays()
+
+
+async def test_async_get_relays_generic_error(hass):
+    """Test CameDomoticError raises ApiClientError."""
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_api.async_get_relays.side_effect = CameDomoticError("generic")
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientError):
+        await client.async_get_relays()
+
+
+async def test_async_get_relays_not_initialized(hass):
+    """Test async_get_relays raises ApiClientError when not connected."""
+    client = _make_client(hass)
+
+    with pytest.raises(CameDomoticApiClientError, match="Not initialized"):
+        await client.async_get_relays()
+
+
+# --- async_set_relay_status ---
+
+
+async def test_async_set_relay_status_success(hass):
+    """Test successful relay status change."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relay = MagicMock()
+    mock_relay.name = "Pump Control"
+    mock_relay.act_id = 600
+    mock_relay.async_set_status = AsyncMock()
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    await client.async_set_relay_status(mock_relay, RelayStatus.ON)
+    mock_relay.async_set_status.assert_awaited_once_with(RelayStatus.ON)
+
+
+async def test_async_set_relay_status_off(hass):
+    """Test relay status change to OFF."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relay = MagicMock()
+    mock_relay.name = "Pump Control"
+    mock_relay.act_id = 600
+    mock_relay.async_set_status = AsyncMock()
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    await client.async_set_relay_status(mock_relay, RelayStatus.OFF)
+    mock_relay.async_set_status.assert_awaited_once_with(RelayStatus.OFF)
+
+
+async def test_async_set_relay_status_auth_error(hass):
+    """Test CameDomoticAuthError during relay status change raises AuthenticationError."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relay = MagicMock()
+    mock_relay.name = "Pump Control"
+    mock_relay.act_id = 600
+    mock_relay.async_set_status = AsyncMock(
+        side_effect=CameDomoticAuthError("bad creds")
+    )
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientAuthenticationError):
+        await client.async_set_relay_status(mock_relay, RelayStatus.ON)
+
+
+async def test_async_set_relay_status_server_error(hass):
+    """Test CameDomoticServerError during relay status change raises CommunicationError."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relay = MagicMock()
+    mock_relay.name = "Pump Control"
+    mock_relay.act_id = 600
+    mock_relay.async_set_status = AsyncMock(
+        side_effect=CameDomoticServerError("server err")
+    )
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientCommunicationError):
+        await client.async_set_relay_status(mock_relay, RelayStatus.ON)
+
+
+async def test_async_set_relay_status_generic_error(hass):
+    """Test CameDomoticError during relay status change raises ApiClientError."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_api = AsyncMock()
+    mock_relay = MagicMock()
+    mock_relay.name = "Pump Control"
+    mock_relay.act_id = 600
+    mock_relay.async_set_status = AsyncMock(side_effect=CameDomoticError("generic"))
+
+    with patch(_PATCH_ASYNC_CREATE, return_value=mock_api):
+        await client.async_connect()
+
+    with pytest.raises(CameDomoticApiClientError):
+        await client.async_set_relay_status(mock_relay, RelayStatus.ON)
+
+
+async def test_async_set_relay_status_not_initialized(hass):
+    """Test async_set_relay_status raises ApiClientError when not connected."""
+    from aiocamedomotic.models import RelayStatus
+
+    client = _make_client(hass)
+    mock_relay = MagicMock()
+
+    with pytest.raises(CameDomoticApiClientError, match="Not initialized"):
+        await client.async_set_relay_status(mock_relay, RelayStatus.ON)
+
+
 # --- async_get_users ---
 
 

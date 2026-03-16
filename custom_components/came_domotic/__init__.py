@@ -40,6 +40,7 @@ PLATFORMS: list[Platform] = [
     Platform.SCENE,
     Platform.SELECT,
     Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 type CameDomoticConfigEntry = ConfigEntry[RuntimeData]

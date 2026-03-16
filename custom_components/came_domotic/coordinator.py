@@ -170,15 +170,40 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
 
         Called during initial setup (async_config_entry_first_refresh) and
         when a plant configuration change is detected.
+
+        Only fetches device types that the server advertises in its
+        ``server_info.features`` list. This avoids sending unsupported
+        commands to servers that lack certain device categories.
         """
         try:
             server_info = await self.api.async_get_server_info()
-            thermo_zones = await self.api.async_get_thermo_zones()
-            scenarios = await self.api.async_get_scenarios()
-            openings = await self.api.async_get_openings()
-            lights = await self.api.async_get_lights()
-            digital_inputs = await self.api.async_get_digital_inputs()
-            analog_sensors = await self.api.async_get_analog_sensors()
+            features = server_info.features
+
+            thermo_zones: list = []
+            analog_sensors: list = []
+            if "thermoregulation" in features:
+                thermo_zones = await self.api.async_get_thermo_zones()
+                analog_sensors = await self.api.async_get_analog_sensors()
+
+            scenarios: list = []
+            if "scenarios" in features:
+                scenarios = await self.api.async_get_scenarios()
+
+            openings: list = []
+            if "openings" in features:
+                openings = await self.api.async_get_openings()
+
+            lights: list = []
+            if "lights" in features:
+                lights = await self.api.async_get_lights()
+
+            digital_inputs: list = []
+            if "digitalin" in features:
+                digital_inputs = await self.api.async_get_digital_inputs()
+
+            relays: list = []
+            if "relays" in features:
+                relays = await self.api.async_get_relays()
         except CameDomoticApiClientAuthenticationError as exception:
             _LOGGER.warning("Authentication failed during data update")
             raise ConfigEntryAuthFailed(exception) from exception
@@ -205,15 +230,18 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             )
 
         _LOGGER.debug(
-            "Full data fetch complete: %d thermo zone(s), %d scenario(s), "
-            "%d opening(s), %d light(s), %d digital input(s), "
-            "%d analog sensor(s), topology=%s",
+            "Full data fetch complete (features=%s): %d thermo zone(s), "
+            "%d scenario(s), %d opening(s), %d light(s), "
+            "%d digital input(s), %d analog sensor(s), %d relay(s), "
+            "topology=%s",
+            features,
             len(thermo_zones),
             len(scenarios),
             len(openings),
             len(lights),
             len(digital_inputs),
             len(analog_sensors),
+            len(relays),
             f"{len(topology.floors)} floor(s)" if topology else "unavailable",
         )
         return CameDomoticServerData(
@@ -224,6 +252,7 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             lights={lt.act_id: lt for lt in lights},
             digital_inputs={di.act_id: di for di in digital_inputs},
             analog_sensors={s.act_id: s for s in analog_sensors},
+            relays={r.act_id: r for r in relays},
             topology=topology,
         )
 
@@ -486,5 +515,27 @@ class CameDomoticDataUpdateCoordinator(DataUpdateCoordinator[CameDomoticServerDa
             else:
                 _LOGGER.debug(
                     "Received update for unknown digital input act_id=%d, ignoring",
+                    update.act_id,
+                )
+
+        # Merge relay updates
+        relay_updates = update_list.get_typed_by_device_type(DeviceType.GENERIC_RELAY)
+        if relay_updates:
+            _LOGGER.debug(
+                "Merging incremental updates: %d relay update(s)",
+                len(relay_updates),
+            )
+        for update in relay_updates:
+            relay = self.data.relays.get(update.act_id)
+            if relay is not None:
+                relay.raw_data.update(update.raw_data)
+                _LOGGER.debug(
+                    "Applied update to relay '%s' (act_id=%d)",
+                    update.name,
+                    update.act_id,
+                )
+            else:
+                _LOGGER.debug(
+                    "Received update for unknown relay act_id=%d, ignoring",
                     update.act_id,
                 )
