@@ -23,6 +23,8 @@ from aiocamedomotic.models import (
     Opening,
     OpeningStatus,
     PlantTopology,
+    Relay,
+    RelayStatus,
     Scenario,
     ServerInfo,
     TerminalGroup,
@@ -197,6 +199,32 @@ class CameDomoticApiClient:
         sensors = await self._api.async_get_analog_sensors()
         _LOGGER.debug("Fetched %d analog sensor(s)", len(sensors))
         return sensors
+
+    @_translate_errors
+    async def async_get_relays(self) -> list[Relay]:
+        """Fetch relays from the CAME Domotic server."""
+        assert self._api is not None  # noqa: S101  # nosec B101
+        _LOGGER.debug("Fetching relays from %s", self._host)
+        relays = await self._api.async_get_relays()
+        _LOGGER.debug("Fetched %d relay(s)", len(relays))
+        return relays
+
+    @_translate_errors
+    async def async_set_relay_status(self, relay: Relay, status: RelayStatus) -> None:
+        """Set the status of a relay.
+
+        Args:
+            relay: The Relay object to control.
+            status: The desired RelayStatus (ON, OFF).
+        """
+        assert self._api is not None  # noqa: S101  # nosec B101
+        _LOGGER.debug(
+            "Setting relay '%s' (act_id=%d) to %s",
+            relay.name,
+            relay.act_id,
+            status.name,
+        )
+        await relay.async_set_status(status)
 
     @_translate_errors
     async def async_set_light_status(

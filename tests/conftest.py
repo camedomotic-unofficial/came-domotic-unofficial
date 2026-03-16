@@ -12,6 +12,7 @@ from aiocamedomotic.models import (
     LightType,
     OpeningStatus,
     OpeningType,
+    RelayStatus,
     ThermoZoneFanSpeed,
     ThermoZoneMode,
     ThermoZoneSeason,
@@ -322,6 +323,40 @@ MOCK_ANALOG_SENSORS = [
 ]
 
 
+def _mock_relay(
+    act_id,
+    name,
+    status=RelayStatus.OFF,
+    floor_ind=0,
+    room_ind=0,
+):
+    """Create a mock Relay object with all required attributes.
+
+    Includes a raw_data dict so that coordinator merge logic
+    (raw_data.update) works correctly in tests.
+    """
+    relay = MagicMock()
+    relay.act_id = act_id
+    relay.name = name
+    relay.status = status
+    relay.floor_ind = floor_ind
+    relay.room_ind = room_ind
+    relay.raw_data = {
+        "act_id": act_id,
+        "name": name,
+        "status": status.value,
+        "floor_ind": floor_ind,
+        "room_ind": room_ind,
+    }
+    return relay
+
+
+MOCK_RELAYS = [
+    _mock_relay(600, "Pump Control"),
+    _mock_relay(601, "Heating Relay", floor_ind=1, room_ind=1),
+]
+
+
 def _mock_topology_room(room_id, name):
     """Create a mock TopologyRoom object."""
     room = MagicMock()
@@ -360,14 +395,31 @@ def _mock_topology():
 MOCK_TOPOLOGY = _mock_topology()
 
 
-def _mock_server_info():
-    """Create a mock ServerInfo object."""
+def _mock_server_info(
+    features=None,
+):
+    """Create a mock ServerInfo object.
+
+    Args:
+        features: List of feature strings the server supports.
+            Defaults to all known features so existing tests keep working.
+    """
+    if features is None:
+        features = [
+            "lights",
+            "openings",
+            "thermoregulation",
+            "scenarios",
+            "digitalin",
+            "relays",
+        ]
     info = MagicMock()
     info.keycode = MOCK_KEYCODE
     info.swver = "1.2.3"
     info.type = "ETI/Domo"
     info.board = "board_v1"
     info.serial = "0011FFEE"
+    info.features = features
     return info
 
 
@@ -381,6 +433,7 @@ MOCK_SERVER_DATA = CameDomoticServerData(
     lights={lt.act_id: lt for lt in MOCK_LIGHTS},
     digital_inputs={di.act_id: di for di in MOCK_DIGITAL_INPUTS},
     analog_sensors={s.act_id: s for s in MOCK_ANALOG_SENSORS},
+    relays={r.act_id: r for r in MOCK_RELAYS},
     topology=MOCK_TOPOLOGY,
 )
 
@@ -423,6 +476,10 @@ def bypass_get_data_fixture():
         patch(
             f"{_API_CLIENT}.async_get_analog_sensors",
             return_value=list(MOCK_ANALOG_SENSORS),
+        ),
+        patch(
+            f"{_API_CLIENT}.async_get_relays",
+            return_value=list(MOCK_RELAYS),
         ),
         patch(
             f"{_API_CLIENT}.async_get_topology",

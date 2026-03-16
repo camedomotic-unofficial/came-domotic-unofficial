@@ -59,6 +59,7 @@ async def _setup_entry(
             f"{_API_CLIENT}.async_get_analog_sensors",
             return_value=mock_analog_sensors,
         ),
+        patch(f"{_API_CLIENT}.async_get_relays", return_value=[]),
         patch(
             f"{_API_CLIENT}.async_get_topology",
             return_value=_mock_topology(),

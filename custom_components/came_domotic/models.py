@@ -10,6 +10,7 @@ from aiocamedomotic.models import (
     Light,
     Opening,
     PlantTopology,
+    Relay,
     Scenario,
     ServerInfo,
     ThermoZone,
@@ -40,4 +41,5 @@ class CameDomoticServerData:
     lights: dict[int, Light] = field(default_factory=dict)
     digital_inputs: dict[int, DigitalInput] = field(default_factory=dict)
     analog_sensors: dict[int, AnalogSensor] = field(default_factory=dict)
+    relays: dict[int, Relay] = field(default_factory=dict)
     topology: PlantTopology | None = None
