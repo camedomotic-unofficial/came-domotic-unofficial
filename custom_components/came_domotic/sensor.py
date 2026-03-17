@@ -139,16 +139,36 @@ ANALOG_INPUT_DESCRIPTIONS: dict[str, CameDomoticAnalogInputDescription] = {
 }
 
 
+def _normalize_unit(unit: str | None) -> str:
+    """Normalize a unit string for case-insensitive, variant-tolerant lookup.
+
+    Strips leading/trailing whitespace, removes degree symbols (° and º),
+    and lowercases the result so that e.g. '°C', 'c', ' hPa ', 'HPA' all
+    match their canonical entries.
+    """
+    if not unit:
+        return ""
+    return unit.strip().replace("°", "").replace("\u00ba", "").lower()
+
+
+_NORMALIZED_ANALOG_INPUT_DESCRIPTIONS: dict[str, CameDomoticAnalogInputDescription] = {
+    _normalize_unit(k): v for k, v in ANALOG_INPUT_DESCRIPTIONS.items()
+}
+
+
 def _get_analog_input_description(
     analog_input: AnalogIn,
 ) -> CameDomoticAnalogInputDescription:
     """Return the entity description for an analog input based on its unit.
 
     Known units ('C', '%', 'hPa') are mapped to HA device classes for
-    proper rendering. Unknown units fall back to a generic description
-    that preserves the raw unit string.
+    proper rendering.  The lookup is case-insensitive and tolerates common
+    variants (e.g. '°C', 'HPA').  Unknown units fall back to a generic
+    description that preserves the raw unit string.
     """
-    known = ANALOG_INPUT_DESCRIPTIONS.get(analog_input.unit)
+    known = _NORMALIZED_ANALOG_INPUT_DESCRIPTIONS.get(
+        _normalize_unit(analog_input.unit)
+    )
     if known is not None:
         return known
     return CameDomoticAnalogInputDescription(
