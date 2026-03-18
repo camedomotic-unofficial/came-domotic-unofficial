@@ -64,12 +64,25 @@ SET_TIMER_TIMETABLE_SCHEMA: vol.Schema = {  # type: ignore[assignment]
 def _parse_time_string(value: str) -> tuple[int, int, int]:
     """Parse a time string (HH:MM or HH:MM:SS) to (hour, min, sec) tuple."""
     parts = value.split(":")
-    if len(parts) == 2:  # noqa: PLR2004
-        return int(parts[0]), int(parts[1]), 0
-    if len(parts) == 3:  # noqa: PLR2004
-        return int(parts[0]), int(parts[1]), int(parts[2])
-    msg = f"Invalid time format '{value}', expected HH:MM or HH:MM:SS"
-    raise vol.Invalid(msg)
+    if len(parts) not in (2, 3):  # noqa: PLR2004
+        msg = f"Invalid time format '{value}', expected HH:MM or HH:MM:SS"
+        raise vol.Invalid(msg)
+    try:
+        hour, minute = int(parts[0]), int(parts[1])
+        second = int(parts[2]) if len(parts) == 3 else 0  # noqa: PLR2004
+    except ValueError:
+        msg = f"Invalid time format '{value}', non-numeric components"
+        raise vol.Invalid(msg) from None
+    if not (0 <= hour <= 23):  # noqa: PLR2004
+        msg = f"Invalid time '{value}', hour must be 0-23"
+        raise vol.Invalid(msg)
+    if not (0 <= minute <= 59):  # noqa: PLR2004
+        msg = f"Invalid time '{value}', minute must be 0-59"
+        raise vol.Invalid(msg)
+    if not (0 <= second <= 59):  # noqa: PLR2004
+        msg = f"Invalid time '{value}', second must be 0-59"
+        raise vol.Invalid(msg)
+    return hour, minute, second
 
 
 async def async_setup_entry(
@@ -449,9 +462,14 @@ class CameDomoticTimer(CameDomoticEntity, SwitchEntity):
                     await self.coordinator.api.async_disable_timer_day(timer, day_index)
 
         if slots is not None:
-            parsed: list[tuple[int, int, int] | None] = [
-                _parse_time_string(s["start"]) for s in slots
-            ]
+            parsed: list[tuple[int, int, int] | None] = []
+            for s in slots:
+                parsed.append(_parse_time_string(s["start"]))
+                # Validate stop format if provided, even though the API only
+                # accepts start times (stop is accepted for schema consistency
+                # but not forwarded to the server).
+                if "stop" in s:
+                    _parse_time_string(s["stop"])
             # Pad to exactly 4 entries
             while len(parsed) < 4:  # noqa: PLR2004
                 parsed.append(None)

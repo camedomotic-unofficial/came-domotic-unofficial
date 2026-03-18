@@ -1084,6 +1084,62 @@ async def test_set_timer_timetable_invalid_time_format(hass):
         _parse_time_string("08")
 
 
+async def test_parse_time_string_non_numeric(hass):
+    """Test that non-numeric time components raise vol.Invalid."""
+    import voluptuous as vol
+
+    from custom_components.came_domotic.switch import _parse_time_string
+
+    with pytest.raises(vol.Invalid, match="non-numeric"):
+        _parse_time_string("ab:cd")
+
+    with pytest.raises(vol.Invalid, match="non-numeric"):
+        _parse_time_string("12:xx:00")
+
+
+async def test_parse_time_string_out_of_range(hass):
+    """Test that out-of-range time values raise vol.Invalid."""
+    import voluptuous as vol
+
+    from custom_components.came_domotic.switch import _parse_time_string
+
+    with pytest.raises(vol.Invalid, match="hour must be 0-23"):
+        _parse_time_string("24:00")
+
+    with pytest.raises(vol.Invalid, match="minute must be 0-59"):
+        _parse_time_string("12:60")
+
+    with pytest.raises(vol.Invalid, match="second must be 0-59"):
+        _parse_time_string("12:00:60")
+
+
+async def test_set_timer_timetable_invalid_stop_format(hass):
+    """Test that an invalid stop time format raises vol.Invalid."""
+    import voluptuous as vol
+
+    timers = [_mock_timer(900, "Morning Timer")]
+    config_entry = await _setup_entry(hass, [], mock_timers=timers)
+
+    coordinator = config_entry.runtime_data.coordinator
+    mock_set_tt = AsyncMock()
+
+    with (
+        patch.object(coordinator.api, "async_set_timer_timetable", mock_set_tt),
+        pytest.raises(vol.Invalid, match="non-numeric"),
+    ):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_timer_timetable",
+            {
+                "entity_id": "switch.morning_timer",
+                "slots": [{"start": "08:00", "stop": "bad:time"}],
+            },
+            blocking=True,
+        )
+
+    mock_set_tt.assert_not_awaited()
+
+
 async def test_timer_optimistic_timeout_resets_on_rapid_commands(hass):
     """Test rapid on/off cancels the first optimistic timer and starts a new one."""
     timers = [_mock_timer(900, "Morning Timer", enabled=False)]
