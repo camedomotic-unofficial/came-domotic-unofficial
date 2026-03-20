@@ -111,6 +111,53 @@ Pattern for adding new platforms:
 - Never log credentials (passwords, usernames). Only log host addresses for connection context.
 - Avoid double-logging errors that are caught and re-raised — log before re-raising only when the context would otherwise be lost
 
+## Branching, PRs & Releases
+
+### Branch naming
+
+Use descriptive kebab-case names: `add-fan-entity`, `fix-cover-tilt`, `bump-aiocamedomotic-1.11.0`.
+
+### PR titles
+
+PR titles become the release changelog — write them from a **user's perspective**. They should describe the visible change, not the implementation.
+
+- **Good**: "Add fan speed control for climate entities"
+- **Good**: "Fix cover tilt position not updating after reboot"
+- **Bad**: "Update climate.py"
+- **Bad**: "Fix #123"
+- **Bad**: "Refactor coordinator merge logic" → OK only if labeled `refactoring` (excluded from changelog)
+
+### Attribution
+
+NEVER mention Claude, Claude Code, Anthropic, or AI assistance in commit messages, PR titles, PR descriptions, PR comments, or any other git/GitHub content. No `Co-Authored-By` lines, no "Generated with Claude Code" footers, no AI references of any kind.
+
+### PR labels
+
+Every PR must have exactly one of these labels (used by `.github/release.yml` to categorize changelog entries):
+
+| Label           | When to use                        | Shown in changelog?      |
+| --------------- | ---------------------------------- | ------------------------ |
+| `enhancement`   | New user-facing feature            | Yes — "New Features"     |
+| `bug`           | Bug fix                            | Yes — "Bug Fixes"        |
+| `breaking`      | Breaking change or removal         | Yes — "Breaking Changes" |
+| `performance`   | Performance improvement            | Yes — "Performance"      |
+| `dependencies`  | Dependency bumps                   | Yes — "Dependencies"     |
+| `documentation` | Docs changes                       | Yes — "Documentation"    |
+| `refactoring`   | Internal refactor, tests, or style | Yes — "Other Changes"    |
+| `ci`            | CI/workflow changes                | No (excluded)            |
+
+### Creating a release
+
+Trigger the Release workflow (`.github/workflows/release.yml`) via CLI or GitHub UI:
+
+```bash
+gh workflow run release.yml -f bump=patch   # bug fixes, dependency bumps
+gh workflow run release.yml -f bump=minor   # new features
+gh workflow run release.yml -f bump=major   # breaking changes
+```
+
+The workflow bumps `manifest.json`, opens a PR to main with auto-merge, tags the merged commit, and publishes a GitHub Release with auto-generated notes categorized by PR labels.
+
 ## CI & Merge Workflow
 
 The `main` branch is protected by a GitHub ruleset. All four CI checks must pass before a PR can merge:

@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    labels:
+      - ci
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: New Features
+      labels:
+        - enhancement
+    - title: Bug Fixes
+      labels:
+        - bug
+    - title: Performance
+      labels:
+        - performance
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Other Changes
+      labels:
+        - refactoring
