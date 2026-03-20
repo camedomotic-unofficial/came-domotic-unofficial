@@ -18,5 +18,3 @@ jobs:
 
       - name: Run Labeler
         uses: crazy-max/ghaction-github-labeler@v6
-        with:
-          skip-delete: true
